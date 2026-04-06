@@ -29,6 +29,7 @@ export interface Item {
   tenderEndDate?: number;
   tenderLimit?: number;
   tenderHistory?: TenderHistory[];
+  previousTenderStock?: number;
 }
 
 export interface Transaction {
@@ -166,8 +167,11 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
   }
 
   if (tx.type === 'GİRİŞ') {
-    if (needsTender && item.tenderLimit && (item.currentStock + tx.quantity > item.tenderLimit)) {
-      throw new Error(`İhale limitini aşamazsınız! Maksimum eklenebilecek miktar: ${item.tenderLimit - item.currentStock}. Yeni ihale yapılması gerekmektedir.`);
+    if (needsTender && item.tenderLimit) {
+      const currentTenderStock = item.currentStock - (item.previousTenderStock || 0);
+      if (currentTenderStock + tx.quantity > item.tenderLimit) {
+        throw new Error(`İhale limitini aşamazsınız! Maksimum eklenebilecek miktar: ${item.tenderLimit - currentTenderStock}. Yeni ihale yapılması gerekmektedir.`);
+      }
     }
     item.currentStock += tx.quantity;
   } else if (tx.type === 'ÇIKIŞ') {
@@ -177,6 +181,15 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
     if (item.currentStock < tx.quantity) {
       throw new Error('Yetersiz stok!');
     }
+    
+    if (item.previousTenderStock && item.previousTenderStock > 0) {
+      if (tx.quantity <= item.previousTenderStock) {
+        item.previousTenderStock -= tx.quantity;
+      } else {
+        item.previousTenderStock = 0;
+      }
+    }
+
     item.currentStock -= tx.quantity;
   }
 

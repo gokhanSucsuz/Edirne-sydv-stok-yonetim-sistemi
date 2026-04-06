@@ -272,8 +272,9 @@ export default function Statistics() {
               <th>Malzeme</th>
               <th>İhale Adı</th>
               <th>Geçerlilik Tarihi</th>
+              <th>Önceki İhaleden Devreden</th>
               <th>İhale Limiti</th>
-              <th>Mevcut Stok</th>
+              <th>Mevcut Toplam Stok</th>
             </tr>
           </thead>
           <tbody>
@@ -283,6 +284,7 @@ export default function Statistics() {
                 <td>${item.name}</td>
                 <td>${item.tenderName}</td>
                 <td>${item.tenderEndDate ? format(item.tenderEndDate, 'dd.MM.yyyy') : '-'}</td>
+                <td>${item.previousTenderStock || 0} ${item.measurementUnit}</td>
                 <td>${item.tenderLimit} ${item.measurementUnit}</td>
                 <td>${item.currentStock} ${item.measurementUnit}</td>
               </tr>

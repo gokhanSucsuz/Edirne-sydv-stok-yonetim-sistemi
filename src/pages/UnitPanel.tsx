@@ -11,7 +11,7 @@ import {
   addTransaction,
   updateItem
 } from '../lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface UnitPanelProps {
@@ -125,14 +125,18 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     if (!editingItem) return;
 
     let newHistory = editingItem.tenderHistory ? [...editingItem.tenderHistory] : [];
+    let newPreviousTenderStock = editingItem.previousTenderStock || 0;
 
     if (needsTender) {
       if (!editTenderName || !editTenderLimit) {
         alert('İhale adı ve ihale stok limiti zorunludur.');
         return;
       }
-      if (editingItem.tenderLimit && Number(editTenderLimit) > editingItem.tenderLimit) {
-        alert('İhalede belirtilen stok miktarı arttırılamaz. Yeni ihale yapılması gerekmektedir.');
+      
+      const isNewTender = editingItem.tenderName && editTenderName && editingItem.tenderName !== editTenderName;
+
+      if (!isNewTender && editingItem.tenderLimit && Number(editTenderLimit) > editingItem.tenderLimit) {
+        alert('Mevcut ihalede belirtilen stok miktarı arttırılamaz. Yeni ihale yapılması gerekmektedir (İhale adını değiştirerek yeni ihale tanımlayabilirsiniz).');
         return;
       }
       
@@ -150,6 +154,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         }
         const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
         if (!selectedPersonnel) return;
+        
+        if (isNewTender) {
+           newPreviousTenderStock = editingItem.currentStock;
+           changes.push(`Önceki ihaleden devreden stok: ${newPreviousTenderStock}`);
+        }
+
         newHistory.push({
           date: Date.now(),
           personnelId: Number(editPersonnelId),
@@ -167,7 +177,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         tenderName: editTenderName,
         tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
         tenderLimit: Number(editTenderLimit),
-        tenderHistory: newHistory
+        tenderHistory: newHistory,
+        previousTenderStock: newPreviousTenderStock
       } : {})
     });
 
@@ -355,11 +366,38 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     return acc;
   }, {} as Record<number, Item>);
 
+  const lowStockItems = items.filter(item => {
+    const threshold = item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2;
+    return item.currentStock < threshold;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">{unit} Paneli</h1>
       </div>
+
+      {lowStockItems.length > 0 && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">Düşük Stok Uyarısı</h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <ul className="list-disc pl-5 space-y-1">
+                  {lowStockItems.map(item => (
+                    <li key={item.id}>
+                      <strong>{item.name}</strong> kritik seviyede! Mevcut stok: {item.currentStock} {item.measurementUnit}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {personnel.length === 0 && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4">
@@ -490,7 +528,15 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                     items.map((item) => (
                       <tr key={item.id}>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                          {item.name}
+                          <div className="flex items-center">
+                            {item.name}
+                            {item.tenderLimit && item.currentStock < Math.max(item.tenderLimit * 0.1, 2) && (
+                              <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
+                            )}
+                            {!item.tenderLimit && item.currentStock < 2 && (
+                              <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
+                            )}
+                          </div>
                           {item.tenderName && (
                             <div 
                               className="text-xs text-blue-600 font-normal mt-1 cursor-pointer hover:underline flex items-center"
