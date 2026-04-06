@@ -10,7 +10,8 @@ import {
   Gift, 
   Building2,
   Menu,
-  X
+  X,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Bağış', href: '/unit/bagis', icon: Gift },
   { name: 'Vakıf', href: '/unit/vakif', icon: Building2 },
   { name: 'İstatistik & Raporlar', href: '/statistics', icon: BarChart3 },
+  { name: 'Kullanım Kılavuzu', href: '/guide', icon: BookOpen },
 ];
 
 export default function Layout() {

@@ -233,6 +233,100 @@ export default function Statistics() {
     printWindow.document.close();
   };
 
+  const handleTenderPrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const tenderItems = items.filter(i => i.tenderName);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>İhale İstatistikleri Raporu</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { margin: 0 0 10px 0; font-size: 20px; }
+          .header p { margin: 0; font-size: 14px; color: #666; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .history-table { margin-top: 10px; width: 100%; border: 1px dashed #ccc; }
+          .history-table th, .history-table td { border: none; border-bottom: 1px dashed #eee; padding: 4px; font-size: 11px; }
+          .history-table th { background-color: #fafafa; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>T.C. EDİRNE VALİLİĞİ</h1>
+          <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
+          <h3>İhale İstatistikleri ve Değişiklik Raporu</h3>
+          <p>Tarih: ${format(new Date(), 'dd.MM.yyyy HH:mm')}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Birim</th>
+              <th>Malzeme</th>
+              <th>İhale Adı</th>
+              <th>Geçerlilik Tarihi</th>
+              <th>İhale Limiti</th>
+              <th>Mevcut Stok</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tenderItems.map(item => `
+              <tr>
+                <td>${item.unit}</td>
+                <td>${item.name}</td>
+                <td>${item.tenderName}</td>
+                <td>${item.tenderEndDate ? format(item.tenderEndDate, 'dd.MM.yyyy') : '-'}</td>
+                <td>${item.tenderLimit} ${item.measurementUnit}</td>
+                <td>${item.currentStock} ${item.measurementUnit}</td>
+              </tr>
+              ${item.tenderHistory && item.tenderHistory.length > 0 ? `
+                <tr>
+                  <td colspan="6" style="padding: 10px 20px; background-color: #fcfcfc;">
+                    <strong>Değişiklik Geçmişi:</strong>
+                    <table class="history-table">
+                      <thead>
+                        <tr>
+                          <th>Tarih</th>
+                          <th>Personel</th>
+                          <th>Değişiklikler</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${item.tenderHistory.map(h => `
+                          <tr>
+                            <td>${format(h.date, 'dd.MM.yyyy HH:mm')}</td>
+                            <td>${h.personnelName}</td>
+                            <td>${h.changes}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              ` : ''}
+            `).join('')}
+            ${tenderItems.length === 0 ? '<tr><td colspan="6" style="text-align:center;">İhale kaydı bulunamadı.</td></tr>' : ''}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -276,10 +370,17 @@ export default function Statistics() {
           <div>
             <button
               onClick={handlePrint}
-              className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 mb-2"
             >
               <Printer className="w-4 h-4 mr-2" />
               Raporu Yazdır / PDF Al
+            </button>
+            <button
+              onClick={handleTenderPrint}
+              className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              İhale Raporu Al
             </button>
           </div>
         </div>

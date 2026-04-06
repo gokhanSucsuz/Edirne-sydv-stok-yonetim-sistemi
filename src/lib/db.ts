@@ -11,6 +11,13 @@ export interface Personnel {
   createdAt: number;
 }
 
+export interface TenderHistory {
+  date: number;
+  personnelId: number;
+  personnelName: string;
+  changes: string;
+}
+
 export interface Item {
   id?: number;
   unit: UnitType;
@@ -21,6 +28,7 @@ export interface Item {
   tenderName?: string;
   tenderEndDate?: number;
   tenderLimit?: number;
+  tenderHistory?: TenderHistory[];
 }
 
 export interface Transaction {

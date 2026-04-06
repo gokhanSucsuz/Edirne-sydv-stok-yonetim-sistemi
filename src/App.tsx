@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Personnel from './pages/Personnel';
 import UnitPanel from './pages/UnitPanel';
 import Statistics from './pages/Statistics';
+import Guide from './pages/Guide';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="unit/bagis" element={<UnitPanel unit="Bağış" />} />
           <Route path="unit/vakif" element={<UnitPanel unit="Vakıf" />} />
           <Route path="statistics" element={<Statistics />} />
+          <Route path="guide" element={<Guide />} />
         </Route>
       </Routes>
     </BrowserRouter>

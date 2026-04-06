@@ -48,6 +48,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editTenderName, setEditTenderName] = useState('');
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderLimit, setEditTenderLimit] = useState<number | ''>('');
+  const [editPersonnelId, setEditPersonnelId] = useState('');
+  const [editConfirm, setEditConfirm] = useState(false);
+
+  // History Modal
+  const [historyItem, setHistoryItem] = useState<Item | null>(null);
 
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel] = await Promise.all([
@@ -105,11 +110,15 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setEditTenderName(item.tenderName || '');
     setEditTenderEndDate(item.tenderEndDate ? format(item.tenderEndDate, 'yyyy-MM-dd') : '');
     setEditTenderLimit(item.tenderLimit || '');
+    setEditPersonnelId('');
+    setEditConfirm(false);
   };
 
   const handleUpdateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
+
+    let newHistory = editingItem.tenderHistory ? [...editingItem.tenderHistory] : [];
 
     if (needsTender) {
       if (!editTenderName || !editTenderLimit) {
@@ -120,6 +129,28 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         alert('İhalede belirtilen stok miktarı arttırılamaz. Yeni ihale yapılması gerekmektedir.');
         return;
       }
+      
+      const changes: string[] = [];
+      if (editingItem.tenderName !== editTenderName) changes.push(`İhale Adı: ${editingItem.tenderName} -> ${editTenderName}`);
+      if (editingItem.tenderLimit !== Number(editTenderLimit)) changes.push(`Limit: ${editingItem.tenderLimit} -> ${editTenderLimit}`);
+      
+      const oldDate = editingItem.tenderEndDate ? format(editingItem.tenderEndDate, 'yyyy-MM-dd') : '';
+      if (oldDate !== editTenderEndDate) changes.push(`Tarih: ${oldDate} -> ${editTenderEndDate}`);
+
+      if (changes.length > 0) {
+        if (!editPersonnelId || !editConfirm) {
+          alert('İhale bilgilerinde değişiklik yapmak için işlemi yapan personeli seçmeli ve onay kutusunu işaretlemelisiniz.');
+          return;
+        }
+        const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
+        if (!selectedPersonnel) return;
+        newHistory.push({
+          date: Date.now(),
+          personnelId: Number(editPersonnelId),
+          personnelName: selectedPersonnel.name,
+          changes: changes.join(', ')
+        });
+      }
     }
 
     await updateItem({
@@ -129,7 +160,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       ...(needsTender ? {
         tenderName: editTenderName,
         tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
-        tenderLimit: Number(editTenderLimit)
+        tenderLimit: Number(editTenderLimit),
+        tenderHistory: newHistory
       } : {})
     });
 
@@ -384,7 +416,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">
                           {item.name}
                           {item.tenderName && (
-                            <div className="text-xs text-gray-500 font-normal mt-1">
+                            <div 
+                              className="text-xs text-blue-600 font-normal mt-1 cursor-pointer hover:underline flex items-center"
+                              onClick={() => setHistoryItem(item)}
+                              title="İhale değişiklik geçmişini görmek için tıklayın"
+                            >
                               İhale: {item.tenderName} 
                               {item.tenderEndDate && ` (Bitiş: ${format(item.tenderEndDate, 'dd.MM.yyyy')})`}
                             </div>
@@ -599,21 +635,57 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               </div>
               {needsTender && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">İhale Adı</label>
-                    <input type="text" required value={editTenderName} onChange={e => setEditTenderName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">İhale Bilgileri</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">İhale Adı</label>
+                        <input type="text" required value={editTenderName} onChange={e => setEditTenderName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
+                        <input type="date" value={editTenderEndDate} onChange={e => setEditTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">İhale Stok Limiti</label>
+                        <input type="number" required value={editTenderLimit} onChange={e => setEditTenderLimit(e.target.value ? Number(e.target.value) : '')} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                        {editingItem.tenderLimit && (
+                          <p className="text-xs text-red-500 mt-1">Mevcut limit: {editingItem.tenderLimit}. Limit arttırılamaz.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
-                    <input type="date" value={editTenderEndDate} onChange={e => setEditTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">İhale Stok Limiti</label>
-                    <input type="number" required value={editTenderLimit} onChange={e => setEditTenderLimit(e.target.value ? Number(e.target.value) : '')} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
-                    {editingItem.tenderLimit && (
-                      <p className="text-xs text-red-500 mt-1">Mevcut limit: {editingItem.tenderLimit}. Limit arttırılamaz.</p>
-                    )}
-                  </div>
+
+                  {(editTenderName !== editingItem.tenderName || 
+                    editTenderLimit !== editingItem.tenderLimit || 
+                    editTenderEndDate !== (editingItem.tenderEndDate ? format(editingItem.tenderEndDate, 'yyyy-MM-dd') : '')) && (
+                    <div className="border-t border-gray-200 pt-4 mt-4 bg-yellow-50 p-3 rounded-md">
+                      <h4 className="text-sm font-medium text-yellow-800 mb-3 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        İhale Bilgisi Değişiklik Onayı
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">İşlemi Yapan Personel</label>
+                          <select required value={editPersonnelId} onChange={e => setEditPersonnelId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                            <option value="">Seçiniz...</option>
+                            {personnel.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} - {p.title}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-start">
+                          <div className="flex items-center h-5">
+                            <input id="confirm" type="checkbox" required checked={editConfirm} onChange={e => setEditConfirm(e.target.checked)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded" />
+                          </div>
+                          <div className="ml-3 text-sm">
+                            <label htmlFor="confirm" className="font-medium text-gray-700">Değişikliği Onaylıyorum</label>
+                            <p className="text-gray-500">İhale bilgilerinde yaptığım değişikliğin kayıt altına alınmasını onaylıyorum.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex justify-end space-x-3 mt-6">
@@ -621,6 +693,48 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Kaydet</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* History Modal */}
+      {historyItem && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                İhale Değişiklik Geçmişi: {historyItem.name}
+              </h3>
+              <button onClick={() => setHistoryItem(null)} className="text-gray-400 hover:text-gray-500">
+                <span className="sr-only">Kapat</span>
+                &times;
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto flex-1 pr-2">
+              {historyItem.tenderHistory && historyItem.tenderHistory.length > 0 ? (
+                <div className="space-y-4">
+                  {historyItem.tenderHistory.map((hist, idx) => (
+                    <div key={idx} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-medium text-sm text-gray-900">{hist.personnelName}</span>
+                        <span className="text-xs text-gray-500">{format(hist.date, 'dd.MM.yyyy HH:mm')}</span>
+                      </div>
+                      <p className="text-sm text-gray-700">
+                        <span className="font-medium">Değişiklikler:</span> {hist.changes}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-8">Bu ihale için henüz bir değişiklik kaydedilmemiş.</p>
+              )}
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setHistoryItem(null)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Kapat
+              </button>
+            </div>
           </div>
         </div>
       )}
