@@ -44,6 +44,13 @@ export interface Transaction {
   documentNo: string;
 }
 
+export interface MasterItem {
+  id?: number;
+  name: string;
+  measurementUnit: string;
+  createdAt: number;
+}
+
 interface SydvDB extends DBSchema {
   personnel: {
     key: number;
@@ -65,28 +72,38 @@ interface SydvDB extends DBSchema {
       'by-personnel': number;
     };
   };
+  masterItems: {
+    key: number;
+    value: MasterItem;
+    indexes: { 'by-name': string };
+  };
 }
 
 const DB_NAME = 'edirne-sydv-stok-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export async function initDB(): Promise<IDBPDatabase<SydvDB>> {
   return openDB<SydvDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('personnel')) {
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
         const personnelStore = db.createObjectStore('personnel', { keyPath: 'id', autoIncrement: true });
         personnelStore.createIndex('by-name', 'name');
-      }
-      if (!db.objectStoreNames.contains('items')) {
+
         const itemStore = db.createObjectStore('items', { keyPath: 'id', autoIncrement: true });
         itemStore.createIndex('by-unit', 'unit');
-      }
-      if (!db.objectStoreNames.contains('transactions')) {
+
         const txStore = db.createObjectStore('transactions', { keyPath: 'id', autoIncrement: true });
         txStore.createIndex('by-item', 'itemId');
         txStore.createIndex('by-unit', 'unit');
         txStore.createIndex('by-date', 'date');
         txStore.createIndex('by-personnel', 'personnelId');
+      }
+      
+      if (oldVersion < 2) {
+        if (!db.objectStoreNames.contains('masterItems')) {
+          const masterItemStore = db.createObjectStore('masterItems', { keyPath: 'id', autoIncrement: true });
+          masterItemStore.createIndex('by-name', 'name');
+        }
       }
     },
   });
@@ -197,4 +214,29 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
   const txId = await txStore.add(tx);
   await txDb.done;
   return txId;
+}
+
+// Master Items API
+export async function getMasterItems() {
+  const db = await initDB();
+  return db.getAll('masterItems');
+}
+
+export async function addMasterItem(item: Omit<MasterItem, 'id' | 'createdAt'>) {
+  const db = await initDB();
+  return db.add('masterItems', { ...item, createdAt: Date.now() });
+}
+
+export async function bulkAddMasterItems(items: Omit<MasterItem, 'id' | 'createdAt'>[]) {
+  const db = await initDB();
+  const tx = db.transaction('masterItems', 'readwrite');
+  for (const item of items) {
+    tx.store.add({ ...item, createdAt: Date.now() });
+  }
+  await tx.done;
+}
+
+export async function deleteMasterItem(id: number) {
+  const db = await initDB();
+  return db.delete('masterItems', id);
 }

@@ -10,6 +10,7 @@ import Personnel from './pages/Personnel';
 import UnitPanel from './pages/UnitPanel';
 import Statistics from './pages/Statistics';
 import Guide from './pages/Guide';
+import MasterItems from './pages/MasterItems';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="personnel" element={<Personnel />} />
+          <Route path="master-items" element={<MasterItems />} />
           <Route path="unit/vefa" element={<UnitPanel unit="Vefa Temizlik" />} />
           <Route path="unit/asevi" element={<UnitPanel unit="Aşevi" />} />
           <Route path="unit/dergah" element={<UnitPanel unit="Dergah" />} />

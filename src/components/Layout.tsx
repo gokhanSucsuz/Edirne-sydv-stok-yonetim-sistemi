@@ -11,12 +11,15 @@ import {
   Building2,
   Menu,
   X,
+  PackageOpen,
   BookOpen
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '../constants';
 
 const navigation = [
   { name: 'Gösterge Paneli', href: '/', icon: LayoutDashboard },
+  { name: 'Malzeme Tanımları', href: '/master-items', icon: PackageOpen },
   { name: 'Personel Yönetimi', href: '/personnel', icon: Users },
   { name: 'Vefa Temizlik', href: '/unit/vefa', icon: Droplets },
   { name: 'Aşevi', href: '/unit/asevi', icon: Utensils },
@@ -37,7 +40,10 @@ export default function Layout() {
         <div className="fixed inset-0 bg-gray-900/80" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl flex flex-col">
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-            <span className="text-lg font-bold text-gray-900">Edirne SYDV Stok</span>
+            <div className="flex items-center">
+              <img src={APP_LOGO_URL} alt="Logo" className="w-8 h-8 mr-2 rounded-full" referrerPolicy="no-referrer" />
+              <span className="text-lg font-bold text-gray-900">{APP_NAME}</span>
+            </div>
             <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-gray-700">
               <X className="w-6 h-6" />
             </button>
@@ -66,8 +72,9 @@ export default function Layout() {
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div className="flex flex-col w-64 border-r border-gray-200 bg-white">
-          <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200 bg-red-600">
-            <span className="text-lg font-bold text-white text-center">Edirne SYDV<br/><span className="text-sm font-normal">Stok Yönetim Sistemi</span></span>
+          <div className="flex flex-col items-center justify-center py-6 px-4 border-b border-gray-200 bg-red-600">
+            <img src={APP_LOGO_URL} alt="Logo" className="w-16 h-16 mb-2 rounded-full border-2 border-white shadow-lg" referrerPolicy="no-referrer" />
+            <span className="text-lg font-bold text-white text-center leading-tight">{APP_NAME}<br/><span className="text-sm font-normal opacity-90">{APP_SUBTITLE}</span></span>
           </div>
           <div className="flex flex-col flex-1 overflow-y-auto">
             <nav className="flex-1 px-2 py-4 space-y-1">
@@ -94,7 +101,10 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-red-600 border-b border-gray-200">
-          <span className="text-lg font-bold text-white">Edirne SYDV Stok</span>
+          <div className="flex items-center">
+            <img src={APP_LOGO_URL} alt="Logo" className="w-8 h-8 mr-2 rounded-full border border-white" referrerPolicy="no-referrer" />
+            <span className="text-lg font-bold text-white">{APP_NAME}</span>
+          </div>
           <button onClick={() => setSidebarOpen(true)} className="text-white hover:text-gray-200">
             <Menu className="w-6 h-6" />
           </button>

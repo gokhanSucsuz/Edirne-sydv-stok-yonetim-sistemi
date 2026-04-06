@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { getPersonnel, getAllItems, getAllTransactions, Personnel, Item, Transaction } from '../lib/db';
+import { getPersonnel, getAllItems, getAllTransactions, getMasterItems, Personnel, Item, Transaction } from '../lib/db';
 import { Link } from 'react-router-dom';
-import { Package, ArrowDownRight, ArrowUpRight, Users } from 'lucide-react';
+import { Package, ArrowDownRight, ArrowUpRight, Users, PackageOpen, AlertTriangle } from 'lucide-react';
 
 export default function Dashboard() {
   const [personnelCount, setPersonnelCount] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
+  const [masterItemsCount, setMasterItemsCount] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [personnelMap, setPersonnelMap] = useState<Record<number, string>>({});
 
@@ -22,6 +23,9 @@ export default function Dashboard() {
 
       const items = await getAllItems();
       setTotalItems(items.length);
+
+      const mItems = await getMasterItems();
+      setMasterItemsCount(mItems.length);
 
       const txs = await getAllTransactions();
       // Sort by date descending and get top 5
@@ -43,6 +47,21 @@ export default function Dashboard() {
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
                 Sistemde kayıtlı personel bulunmuyor. Stok işlemlerine başlayabilmek için lütfen önce <Link to="/personnel" className="font-medium underline text-yellow-700 hover:text-yellow-600">personel ekleyin</Link>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {masterItemsCount === 0 && (
+        <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-orange-400" aria-hidden="true" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-orange-700">
+                Sistemde tanımlı malzeme bulunmuyor. İhale veya stok girişi yapabilmek için lütfen önce <Link to="/master-items" className="font-medium underline text-orange-700 hover:text-orange-600">malzeme tanımlayın</Link>.
               </p>
             </div>
           </div>
@@ -77,11 +96,34 @@ export default function Dashboard() {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
+                <PackageOpen className="h-6 w-6 text-gray-400" aria-hidden="true" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Tanımlı Malzeme Sayısı</dt>
+                  <dd>
+                    <div className="text-lg font-medium text-gray-900">{masterItemsCount}</div>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3">
+            <div className="text-sm">
+              <Link to="/master-items" className="font-medium text-red-700 hover:text-red-900">Tümünü gör</Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
                 <Package className="h-6 w-6 text-gray-400" aria-hidden="true" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Toplam Kalem Sayısı</dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Birimlerdeki Toplam Kalem</dt>
                   <dd>
                     <div className="text-lg font-medium text-gray-900">{totalItems}</div>
                   </dd>

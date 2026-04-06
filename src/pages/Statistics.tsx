@@ -11,6 +11,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { format, subDays, subWeeks, subMonths, isAfter } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { APP_LOGO_URL } from '../constants';
 import { Printer, FileText } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -246,9 +247,12 @@ export default function Statistics() {
         <title>İhale İstatistikleri Raporu</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .header h1 { margin: 0 0 10px 0; font-size: 20px; }
-          .header p { margin: 0; font-size: 14px; color: #666; }
+          .header { text-align: center; margin-bottom: 30px; position: relative; }
+          .logo { position: absolute; left: 0; top: 0; width: 80px; height: 80px; border-radius: 50%; }
+          .header h1 { margin: 0 0 5px 0; font-size: 18px; }
+          .header h2 { margin: 0 0 5px 0; font-size: 16px; font-weight: normal; }
+          .header h3 { margin: 10px 0 5px 0; font-size: 14px; text-decoration: underline; }
+          .header p { margin: 0; font-size: 12px; color: #666; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
           th { background-color: #f5f5f5; font-weight: bold; }
@@ -259,6 +263,7 @@ export default function Statistics() {
       </head>
       <body>
         <div class="header">
+          <img src="${APP_LOGO_URL}" class="logo" />
           <h1>T.C. EDİRNE VALİLİĞİ</h1>
           <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
           <h3>İhale İstatistikleri ve Değişiklik Raporu</h3>

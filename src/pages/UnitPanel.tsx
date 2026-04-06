@@ -9,10 +9,14 @@ import {
   getPersonnel, 
   addItem, 
   addTransaction,
-  updateItem
+  updateItem,
+  getMasterItems,
+  MasterItem
 } from '../lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen } from 'lucide-react';
 import { format } from 'date-fns';
+import { APP_LOGO_URL } from '../constants';
+import { Link } from 'react-router-dom';
 
 interface UnitPanelProps {
   unit: UnitType;
@@ -22,6 +26,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
+  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
   
   // New Item Form
   const [newItemName, setNewItemName] = useState('');
@@ -66,14 +71,16 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
 
   const loadData = async () => {
-    const [loadedItems, loadedTxs, loadedPersonnel] = await Promise.all([
+    const [loadedItems, loadedTxs, loadedPersonnel, loadedMasterItems] = await Promise.all([
       getItemsByUnit(unit),
       getTransactionsByUnit(unit),
-      getPersonnel()
+      getPersonnel(),
+      getMasterItems()
     ]);
     setItems(loadedItems);
     setTransactions(loadedTxs.sort((a, b) => b.date - a.date));
     setPersonnel(loadedPersonnel);
+    setMasterItems(loadedMasterItems.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
   useEffect(() => {
@@ -94,6 +101,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setError('');
     if (!newItemName || !newItemUnit) return;
     
+    const isAlreadyInUnit = items.some(i => i.name === newItemName);
+    if (isAlreadyInUnit) {
+      setError('Bu malzeme zaten bu birimde mevcut.');
+      return;
+    }
+
     if (needsTender && (!tenderName || !tenderLimit)) {
       setError('İhale adı ve ihale toplam stoğu zorunludur.');
       return;
@@ -348,7 +361,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         <title>Muayene Kabul Tutanağı</title>
         <style>
           body { font-family: 'Times New Roman', Times, serif; margin: 40px; color: #000; line-height: 1.5; }
-          .header { text-align: center; margin-bottom: 30px; }
+          .header { text-align: center; margin-bottom: 30px; position: relative; }
+          .logo { position: absolute; left: 0; top: 0; width: 80px; height: 80px; border-radius: 50%; }
           .header h1 { font-size: 16px; margin: 5px 0; font-weight: bold; }
           .header h2 { font-size: 14px; margin: 5px 0; font-weight: normal; }
           .title { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 30px; font-size: 16px; }
@@ -363,6 +377,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       </head>
       <body>
         <div class="header">
+          <img src="${APP_LOGO_URL}" class="logo" />
           <h1>T.C.</h1>
           <h1>EDİRNE VALİLİĞİ</h1>
           <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
@@ -421,7 +436,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         <title>Muayene Kabul Tutanağı</title>
         <style>
           body { font-family: 'Times New Roman', Times, serif; margin: 40px; color: #000; line-height: 1.5; }
-          .header { text-align: center; margin-bottom: 30px; }
+          .header { text-align: center; margin-bottom: 30px; position: relative; }
+          .logo { position: absolute; left: 0; top: 0; width: 80px; height: 80px; border-radius: 50%; }
           .header h1 { font-size: 16px; margin: 5px 0; font-weight: bold; }
           .header h2 { font-size: 14px; margin: 5px 0; font-weight: normal; }
           .title { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 30px; font-size: 16px; }
@@ -436,6 +452,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       </head>
       <body>
         <div class="header">
+          <img src="${APP_LOGO_URL}" class="logo" />
           <h1>T.C.</h1>
           <h1>EDİRNE VALİLİĞİ</h1>
           <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
@@ -612,13 +629,28 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">Malzeme Adı</label>
-                  <input
-                    type="text"
-                    required
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                  />
+                  {masterItems.length === 0 ? (
+                    <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded-md flex items-center text-xs text-yellow-700">
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Önce <Link to="/master-items" className="font-bold underline ml-1">Malzeme Tanımları</Link> sayfasından malzeme eklemelisiniz.
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      value={newItemName}
+                      onChange={(e) => {
+                        const selected = masterItems.find(i => i.name === e.target.value);
+                        setNewItemName(e.target.value);
+                        if (selected) setNewItemUnit(selected.measurementUnit);
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                    >
+                      <option value="">Seçiniz...</option>
+                      {masterItems.map(item => (
+                        <option key={item.id} value={item.name}>{item.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div className="w-32">
                   <label className="block text-sm font-medium text-gray-700">Birim</label>
@@ -633,6 +665,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                     <option>Koli</option>
                     <option>Paket</option>
                     <option>Çuval</option>
+                    <option>Teneke</option>
                   </select>
                 </div>
               </div>
@@ -941,7 +974,21 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
             <form onSubmit={handleUpdateItem} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Malzeme Adı</label>
-                <input type="text" required value={editName} onChange={e => setEditName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                <select
+                  required
+                  value={editName}
+                  onChange={(e) => {
+                    const selected = masterItems.find(i => i.name === e.target.value);
+                    setEditName(e.target.value);
+                    if (selected) setEditUnit(selected.measurementUnit);
+                  }}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                >
+                  <option value="">Seçiniz...</option>
+                  {masterItems.map(item => (
+                    <option key={item.id} value={item.name}>{item.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Birim</label>
@@ -952,6 +999,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   <option>Koli</option>
                   <option>Paket</option>
                   <option>Çuval</option>
+                  <option>Teneke</option>
                 </select>
               </div>
               {needsTender && (
@@ -1110,7 +1158,21 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   <div key={index} className="flex items-center space-x-3 mb-3 bg-white p-3 rounded shadow-sm border border-gray-100">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Malzeme Adı</label>
-                      <input type="text" required value={item.name} onChange={e => handleBulkItemChange(index, 'name', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                      <select
+                        required
+                        value={item.name}
+                        onChange={(e) => {
+                          const selected = masterItems.find(mi => mi.name === e.target.value);
+                          handleBulkItemChange(index, 'name', e.target.value);
+                          if (selected) handleBulkItemChange(index, 'unit', selected.measurementUnit);
+                        }}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                      >
+                        <option value="">Seçiniz...</option>
+                        {masterItems.map(mi => (
+                          <option key={mi.id} value={mi.name}>{mi.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="w-32">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Birim</label>
@@ -1121,6 +1183,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         <option>Koli</option>
                         <option>Paket</option>
                         <option>Çuval</option>
+                        <option>Teneke</option>
                       </select>
                     </div>
                     <div className="w-32">
