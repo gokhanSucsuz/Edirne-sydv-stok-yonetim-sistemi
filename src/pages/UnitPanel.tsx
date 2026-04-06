@@ -10,6 +10,7 @@ import {
   addItem, 
   addTransaction,
   updateItem,
+  deleteItem,
   getMasterItems,
   MasterItem
 } from '../lib/db';
@@ -69,6 +70,21 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [bulkPersonnelId, setBulkPersonnelId] = useState('');
   const [bulkDocumentNo, setBulkDocumentNo] = useState('');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
+
+  // Bulk Exit Modal
+  const [showBulkExitModal, setShowBulkExitModal] = useState(false);
+  const [bulkExitItems, setBulkExitItems] = useState<{ itemId: number | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
+  const [bulkExitPersonnelId, setBulkExitPersonnelId] = useState('');
+  const [bulkExitDocumentNo, setBulkExitDocumentNo] = useState('');
+  const [bulkExitDescription, setBulkExitDescription] = useState('');
+
+  // Edit Tender Modal
+  const [showEditTenderModal, setShowEditTenderModal] = useState(false);
+  const [editingTenderName, setEditingTenderName] = useState('');
+  const [editTenderItems, setEditTenderItems] = useState<Item[]>([]);
+  const [editTenderEndDateVal, setEditTenderEndDateVal] = useState('');
+  const [editTenderPersonnelId, setEditTenderPersonnelId] = useState('');
+  const [editTenderConfirm, setEditTenderConfirm] = useState(false);
 
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel, loadedMasterItems] = await Promise.all([
@@ -284,6 +300,151 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       newItems[index] = { ...newItems[index], [field]: value };
       return newItems;
     });
+  };
+
+  const handleAddBulkExitRow = () => {
+    setBulkExitItems([...bulkExitItems, { itemId: '', quantity: '' }]);
+  };
+
+  const handleRemoveBulkExitRow = (index: number) => {
+    const newItems = [...bulkExitItems];
+    newItems.splice(index, 1);
+    setBulkExitItems(newItems);
+  };
+
+  const handleBulkExitItemChange = (index: number, field: string, value: any) => {
+    const newItems = [...bulkExitItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setBulkExitItems(newItems);
+  };
+
+  const handleSubmitBulkExit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkExitPersonnelId || !bulkExitDocumentNo) {
+      alert('Personel ve evrak no zorunludur.');
+      return;
+    }
+
+    for (const item of bulkExitItems) {
+      if (!item.itemId || !item.quantity) {
+        alert('Tüm satırlar için malzeme ve miktar girilmelidir.');
+        return;
+      }
+      const stockItem = items.find(i => i.id === Number(item.itemId));
+      if (stockItem && stockItem.currentStock < Number(item.quantity)) {
+        alert(`${stockItem.name} için yetersiz stok. Mevcut: ${stockItem.currentStock}`);
+        return;
+      }
+    }
+
+    try {
+      for (const item of bulkExitItems) {
+        await addTransaction({
+          itemId: Number(item.itemId),
+          unit: unit,
+          type: 'ÇIKIŞ',
+          quantity: Number(item.quantity),
+          date: Date.now(),
+          personnelId: Number(bulkExitPersonnelId),
+          description: bulkExitDescription || 'Toplu Stok Çıkışı',
+          documentNo: bulkExitDocumentNo
+        });
+      }
+
+      setShowBulkExitModal(false);
+      setBulkExitItems([{ itemId: '', quantity: '' }]);
+      setBulkExitPersonnelId('');
+      setBulkExitDocumentNo('');
+      setBulkExitDescription('');
+      loadData();
+      alert('Toplu stok çıkışı başarıyla tamamlandı.');
+    } catch (err) {
+      console.error(err);
+      alert('İşlem sırasında bir hata oluştu.');
+    }
+  };
+
+  const handleOpenEditTender = (tName: string) => {
+    const tenderItems = items.filter(i => i.tenderName === tName);
+    setEditingTenderName(tName);
+    setEditTenderItems(tenderItems);
+    const firstItem = tenderItems[0];
+    setEditTenderEndDateVal(firstItem?.tenderEndDate ? format(firstItem.tenderEndDate, 'yyyy-MM-dd') : '');
+    setEditTenderPersonnelId('');
+    setEditTenderConfirm(false);
+    setShowEditTenderModal(true);
+  };
+
+  const handleEditTenderItemChange = (index: number, field: string, value: any) => {
+    const newItems = [...editTenderItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setEditTenderItems(newItems);
+  };
+
+  const handleSubmitEditTender = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTenderPersonnelId || !editTenderConfirm) {
+      alert('İşlemi yapan personeli seçmeli ve onay kutusunu işaretlemelisiniz.');
+      return;
+    }
+
+    try {
+      const selectedPersonnel = personnel.find(p => p.id === Number(editTenderPersonnelId));
+      if (!selectedPersonnel) return;
+
+      for (const item of editTenderItems) {
+        const originalItem = items.find(i => i.id === item.id);
+        if (!originalItem) continue;
+
+        const changes = [];
+        if (originalItem.tenderName !== editingTenderName) changes.push(`İhale Adı: ${originalItem.tenderName} -> ${editingTenderName}`);
+        if (originalItem.tenderLimit !== Number(item.tenderLimit)) changes.push(`Limit: ${originalItem.tenderLimit} -> ${item.tenderLimit}`);
+        
+        const oldDate = originalItem.tenderEndDate ? format(originalItem.tenderEndDate, 'yyyy-MM-dd') : '';
+        if (oldDate !== editTenderEndDateVal) changes.push(`Tarih: ${oldDate} -> ${editTenderEndDateVal}`);
+
+        const newHistory = [...(originalItem.tenderHistory || [])];
+        if (changes.length > 0) {
+          newHistory.push({
+            date: Date.now(),
+            personnelId: Number(editTenderPersonnelId),
+            personnelName: selectedPersonnel.name,
+            changes: changes.join(', ')
+          });
+        }
+
+        await updateItem({
+          ...item,
+          tenderName: editingTenderName,
+          tenderEndDate: editTenderEndDateVal ? new Date(editTenderEndDateVal).getTime() : undefined,
+          tenderLimit: Number(item.tenderLimit),
+          tenderHistory: newHistory
+        });
+      }
+
+      setShowEditTenderModal(false);
+      loadData();
+      alert('İhale başarıyla güncellendi.');
+    } catch (err) {
+      console.error(err);
+      alert('Güncelleme sırasında bir hata oluştu.');
+    }
+  };
+
+  const handleDeleteTender = async () => {
+    if (!window.confirm(`"${editingTenderName}" ihalesine ait TÜM ürünler silinecektir. Bu işlem geri alınamaz. Onaylıyor musunuz?`)) return;
+    
+    try {
+      for (const item of editTenderItems) {
+        if (item.id) await deleteItem(item.id);
+      }
+      setShowEditTenderModal(false);
+      loadData();
+      alert('İhale ve tüm ürünleri başarıyla silindi.');
+    } catch (err) {
+      console.error(err);
+      alert('Silme işlemi sırasında bir hata oluştu.');
+    }
   };
 
   const handleSubmitBulkTender = async (e: React.FormEvent) => {
@@ -609,136 +770,40 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         {/* Stok Durumu ve Yeni Kalem Ekleme */}
         <div className="space-y-6">
           <div className="bg-white shadow sm:rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Yeni Stok Kalemi Ekle</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Stok Giriş / Çıkış Paneli</h3>
             
-            {needsTender && (
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowTenderModal(true)}
-                  className="w-full flex justify-center items-center px-4 py-3 border-2 border-dashed border-red-300 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Yeni İhale Tanımla (Çoklu Ürün Girişi)
-                </button>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  İhaleye ait tüm ürünleri tek seferde eklemek için bu butonu kullanın.
-                </p>
-              </div>
-            )}
-
-            <form onSubmit={handleAddItem} className="space-y-4">
-              <div className="flex gap-4 items-end">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700">Malzeme Adı</label>
-                  {masterItems.length === 0 ? (
-                    <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded-md flex items-center text-xs text-yellow-700">
-                      <AlertTriangle className="w-4 h-4 mr-2" />
-                      Önce <Link to="/master-items" className="font-bold underline ml-1">Malzeme Tanımları</Link> sayfasından malzeme eklemelisiniz.
-                    </div>
-                  ) : (
-                    <select
-                      required
-                      value={newItemName}
-                      onChange={(e) => {
-                        const selected = masterItems.find(i => i.name === e.target.value);
-                        setNewItemName(e.target.value);
-                        if (selected) setNewItemUnit(selected.measurementUnit);
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                    >
-                      <option value="">Seçiniz...</option>
-                      {masterItems.map(item => (
-                        <option key={item.id} value={item.name}>{item.name}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                <div className="w-32">
-                  <label className="block text-sm font-medium text-gray-700">Birim</label>
-                  <select
-                    value={newItemUnit}
-                    onChange={(e) => setNewItemUnit(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                  >
-                    <option>Adet</option>
-                    <option>Kg</option>
-                    <option>Litre</option>
-                    <option>Koli</option>
-                    <option>Paket</option>
-                    <option>Çuval</option>
-                    <option>Teneke</option>
-                  </select>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <button
+                type="button"
+                onClick={() => setShowTenderModal(true)}
+                className="flex justify-center items-center px-4 py-4 border-2 border-dashed border-red-300 rounded-xl text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 transition-all shadow-sm"
+              >
+                <Plus className="w-6 h-6 mr-2" />
+                {needsTender ? 'Yeni İhale Tanımla' : 'Toplu Stok Girişi'}
+              </button>
               
-              {needsTender && (
-                <div className="space-y-4 bg-gray-50 p-3 rounded-md border border-gray-200">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700">İhale Adı</label>
-                      <input
-                        type="text"
-                        value={tenderName}
-                        onChange={(e) => setTenderName(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700">Geçerlilik Tarihi</label>
-                      <input
-                        type="date"
-                        value={tenderEndDate}
-                        onChange={(e) => setTenderEndDate(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700">İhale Toplam Stoğu</label>
-                      <input
-                        type="number"
-                        value={tenderLimit}
-                        onChange={(e) => setTenderLimit(e.target.value ? Number(e.target.value) : '')}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 border-t border-gray-200 pt-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700">İşlemi Yapan Personel</label>
-                      <select
-                        value={addPersonnelId}
-                        onChange={(e) => setAddPersonnelId(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                      >
-                        <option value="">Seçiniz...</option>
-                        {personnel.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700">Evrak No</label>
-                      <input
-                        type="text"
-                        value={addDocumentNo}
-                        onChange={(e) => setAddDocumentNo(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowBulkExitModal(true)}
+                className="flex justify-center items-center px-4 py-4 border-2 border-dashed border-gray-300 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all shadow-sm"
+              >
+                <ArrowUpRight className="w-6 h-6 mr-2" />
+                Toplu Stok Çıkışı
+              </button>
+            </div>
 
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  <Plus className="w-4 h-4 mr-2" /> Ekle
-                </button>
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-blue-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    Sistem artık sadece toplu giriş ve çıkış işlemlerini desteklemektedir. Tekli ürün eklemek yerine yukarıdaki panelleri kullanın.
+                  </p>
+                </div>
               </div>
-            </form>
+            </div>
           </div>
 
           <div className="bg-white shadow sm:rounded-lg overflow-hidden">
@@ -797,9 +862,24 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={() => openEditModal(item)} className="text-indigo-600 hover:text-indigo-900">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={() => setEditingItem(item)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Tekli Düzenle"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {item.tenderName && (
+                              <button
+                                onClick={() => handleOpenEditTender(item.tenderName!)}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="İhaleyi Toplu Düzenle"
+                              >
+                                <PackageOpen className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1178,15 +1258,9 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                     </div>
                     <div className="w-32">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Birim</label>
-                      <select value={item.unit} onChange={e => handleBulkItemChange(index, 'unit', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
-                        <option>Adet</option>
-                        <option>Kg</option>
-                        <option>Litre</option>
-                        <option>Koli</option>
-                        <option>Paket</option>
-                        <option>Çuval</option>
-                        <option>Teneke</option>
-                      </select>
+                      <div className="block w-full rounded-md border-gray-200 bg-gray-100 sm:text-sm p-2 border text-gray-600">
+                        {item.unit}
+                      </div>
                     </div>
                     <div className="w-32">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Toplam Stok</label>
@@ -1204,6 +1278,161 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
                 <button type="button" onClick={() => setShowTenderModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
                 <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">İhaleyi Kaydet</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Bulk Exit Modal */}
+      {showBulkExitModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-xl max-h-[90vh] flex flex-col">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Toplu Stok Çıkışı</h3>
+            <form onSubmit={handleSubmitBulkExit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="grid grid-cols-2 gap-4 mb-6 bg-gray-50 p-3 rounded-md border border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">İşlemi Yapan Personel</label>
+                  <select required value={bulkExitPersonnelId} onChange={e => setBulkExitPersonnelId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                    <option value="">Seçiniz...</option>
+                    {personnel.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Resmi Evrak No</label>
+                  <input type="text" required value={bulkExitDocumentNo} onChange={e => setBulkExitDocumentNo(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Açıklama</label>
+                <input type="text" value={bulkExitDescription} onChange={e => setBulkExitDescription(e.target.value)} placeholder="Toplu çıkış açıklaması..." className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+              </div>
+
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-md font-medium text-gray-800">Çıkış Yapılacak Ürünler</h4>
+                <button type="button" onClick={handleAddBulkExitRow} className="text-sm text-red-600 hover:text-red-800 flex items-center font-medium">
+                  <Plus className="w-4 h-4 mr-1" /> Yeni Satır Ekle
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md p-2 bg-gray-50">
+                {bulkExitItems.map((item, index) => (
+                  <div key={index} className="flex items-center space-x-3 mb-3 bg-white p-3 rounded shadow-sm border border-gray-100">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Malzeme</label>
+                      <select
+                        required
+                        value={item.itemId}
+                        onChange={(e) => handleBulkExitItemChange(index, 'itemId', e.target.value)}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                      >
+                        <option value="">Seçiniz...</option>
+                        {items.map(i => (
+                          <option key={i.id} value={i.id}>{i.name} (Mevcut: {i.currentStock} {i.measurementUnit})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Miktar</label>
+                      <input type="number" required min="0.01" step="0.01" value={item.quantity} onChange={e => handleBulkExitItemChange(index, 'quantity', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                    </div>
+                    <div className="pt-5">
+                      <button type="button" onClick={() => handleRemoveBulkExitRow(index)} disabled={bulkExitItems.length === 1} className="text-gray-400 hover:text-red-600 disabled:opacity-50">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                <button type="button" onClick={() => setShowBulkExitModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
+                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Çıkışları Kaydet</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Tender Modal */}
+      {showEditTenderModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-5xl w-full shadow-xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">İhaleyi Düzenle: {editingTenderName}</h3>
+              <button onClick={handleDeleteTender} className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center">
+                <X className="w-4 h-4 mr-1" /> İhaleyi Sil
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmitEditTender} className="flex flex-col flex-1 overflow-hidden">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">İhale Adı</label>
+                  <input type="text" required value={editingTenderName} onChange={e => setEditingTenderName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
+                  <input type="date" value={editTenderEndDateVal} onChange={e => setEditTenderEndDateVal(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+              </div>
+
+              <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md p-2 bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Malzeme</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Birim</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Toplam Limit</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mevcut Stok</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {editTenderItems.map((item, index) => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
+                        <td className="px-4 py-2 text-sm text-gray-500">{item.measurementUnit}</td>
+                        <td className="px-4 py-2">
+                          <input 
+                            type="number" 
+                            required 
+                            value={item.tenderLimit} 
+                            onChange={e => handleEditTenderItemChange(index, 'tenderLimit', e.target.value)}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1 border"
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-500">{item.currentStock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-6 p-4 bg-yellow-50 rounded-md border border-yellow-200">
+                <div className="flex items-center mb-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700">Değişikliği Onaylayan Personel</label>
+                    <select required value={editTenderPersonnelId} onChange={e => setEditTenderPersonnelId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                      <option value="">Seçiniz...</option>
+                      {personnel.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <input type="checkbox" id="confirmEdit" checked={editTenderConfirm} onChange={e => setEditTenderConfirm(e.target.checked)} className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded" />
+                  <label htmlFor="confirmEdit" className="ml-2 block text-sm text-gray-900 font-medium">
+                    İhale bilgilerindeki değişiklikleri onaylıyorum. Bu işlem geçmişe kaydedilecektir.
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                <button type="button" onClick={() => setShowEditTenderModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
+                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Değişiklikleri Kaydet</button>
               </div>
             </form>
           </div>
