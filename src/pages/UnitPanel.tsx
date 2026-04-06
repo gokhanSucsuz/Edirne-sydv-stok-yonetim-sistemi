@@ -11,7 +11,7 @@ import {
   addTransaction,
   updateItem
 } from '../lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2 } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface UnitPanelProps {
@@ -53,6 +53,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   // History Modal
   const [historyItem, setHistoryItem] = useState<Item | null>(null);
+
+  // Bulk Tender Modal
+  const [showTenderModal, setShowTenderModal] = useState(false);
+  const [bulkTenderName, setBulkTenderName] = useState('');
+  const [bulkTenderEndDate, setBulkTenderEndDate] = useState('');
+  const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
 
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel] = await Promise.all([
@@ -167,6 +173,59 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
     setEditingItem(null);
     loadData();
+  };
+
+  const handleAddBulkItemRow = () => {
+    setBulkItems([...bulkItems, { name: '', unit: 'Adet', limit: '' }]);
+  };
+
+  const handleRemoveBulkItemRow = (index: number) => {
+    const newItems = [...bulkItems];
+    newItems.splice(index, 1);
+    setBulkItems(newItems);
+  };
+
+  const handleBulkItemChange = (index: number, field: string, value: string) => {
+    const newItems = [...bulkItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setBulkItems(newItems);
+  };
+
+  const handleSubmitBulkTender = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkTenderName) {
+      alert('İhale adı zorunludur.');
+      return;
+    }
+    
+    for (const item of bulkItems) {
+      if (!item.name || !item.limit) {
+        alert('Tüm ürünlerin adı ve limiti girilmelidir.');
+        return;
+      }
+    }
+
+    try {
+      for (const item of bulkItems) {
+        await addItem({
+          name: item.name,
+          unit: unit,
+          measurementUnit: item.unit,
+          currentStock: 0,
+          tenderName: bulkTenderName,
+          tenderEndDate: bulkTenderEndDate ? new Date(bulkTenderEndDate).getTime() : undefined,
+          tenderLimit: Number(item.limit)
+        });
+      }
+      setShowTenderModal(false);
+      setBulkTenderName('');
+      setBulkTenderEndDate('');
+      setBulkItems([{ name: '', unit: 'Adet', limit: '' }]);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert('İhale kaydedilirken bir hata oluştu.');
+    }
   };
 
   const printMuayeneKabul = (data: any) => {
@@ -322,6 +381,23 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         <div className="space-y-6">
           <div className="bg-white shadow sm:rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Yeni Stok Kalemi Ekle</h3>
+            
+            {needsTender && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowTenderModal(true)}
+                  className="w-full flex justify-center items-center px-4 py-3 border-2 border-dashed border-red-300 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Yeni İhale Tanımla (Çoklu Ürün Girişi)
+                </button>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  İhaleye ait tüm ürünleri tek seferde eklemek için bu butonu kullanın.
+                </p>
+              </div>
+            )}
+
             <form onSubmit={handleAddItem} className="space-y-4">
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
@@ -735,6 +811,69 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 Kapat
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Bulk Tender Modal */}
+      {showTenderModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-xl max-h-[90vh] flex flex-col">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Yeni İhale Tanımla</h3>
+            <form onSubmit={handleSubmitBulkTender} className="flex flex-col flex-1 overflow-hidden">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">İhale Adı</label>
+                  <input type="text" required value={bulkTenderName} onChange={e => setBulkTenderName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
+                  <input type="date" value={bulkTenderEndDate} onChange={e => setBulkTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-md font-medium text-gray-800">İhale Ürünleri</h4>
+                <button type="button" onClick={handleAddBulkItemRow} className="text-sm text-red-600 hover:text-red-800 flex items-center font-medium">
+                  <Plus className="w-4 h-4 mr-1" /> Yeni Ürün Satırı Ekle
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md p-2 bg-gray-50">
+                {bulkItems.map((item, index) => (
+                  <div key={index} className="flex items-center space-x-3 mb-3 bg-white p-3 rounded shadow-sm border border-gray-100">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Malzeme Adı</label>
+                      <input type="text" required value={item.name} onChange={e => handleBulkItemChange(index, 'name', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Birim</label>
+                      <select value={item.unit} onChange={e => handleBulkItemChange(index, 'unit', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                        <option>Adet</option>
+                        <option>Kg</option>
+                        <option>Litre</option>
+                        <option>Koli</option>
+                        <option>Paket</option>
+                        <option>Çuval</option>
+                      </select>
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">İhale Limiti</label>
+                      <input type="number" required value={item.limit} onChange={e => handleBulkItemChange(index, 'limit', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                    </div>
+                    <div className="pt-5">
+                      <button type="button" onClick={() => handleRemoveBulkItemRow(index)} disabled={bulkItems.length === 1} className="text-gray-400 hover:text-red-600 disabled:opacity-50">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                <button type="button" onClick={() => setShowTenderModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
+                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">İhaleyi Kaydet</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
