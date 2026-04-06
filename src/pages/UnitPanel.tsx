@@ -29,6 +29,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [tenderName, setTenderName] = useState('');
   const [tenderEndDate, setTenderEndDate] = useState('');
   const [tenderLimit, setTenderLimit] = useState<number | ''>('');
+  const [addPersonnelId, setAddPersonnelId] = useState('');
+  const [addDocumentNo, setAddDocumentNo] = useState('');
   
   const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(unit);
   
@@ -49,6 +51,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderLimit, setEditTenderLimit] = useState<number | ''>('');
   const [editPersonnelId, setEditPersonnelId] = useState('');
+  const [editDocumentNo, setEditDocumentNo] = useState('');
   const [editConfirm, setEditConfirm] = useState(false);
 
   // History Modal
@@ -58,6 +61,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [showTenderModal, setShowTenderModal] = useState(false);
   const [bulkTenderName, setBulkTenderName] = useState('');
   const [bulkTenderEndDate, setBulkTenderEndDate] = useState('');
+  const [bulkPersonnelId, setBulkPersonnelId] = useState('');
+  const [bulkDocumentNo, setBulkDocumentNo] = useState('');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
 
   const loadData = async () => {
@@ -77,7 +82,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setTxItemId('');
     setTxPersonnelId('');
     setError('');
-  }, [unit]);
+    if (needsTender) {
+      setTxType('ÇIKIŞ');
+    } else {
+      setTxType('GİRİŞ');
+    }
+  }, [unit, needsTender]);
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,11 +95,16 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     if (!newItemName || !newItemUnit) return;
     
     if (needsTender && (!tenderName || !tenderLimit)) {
-      setError('İhale adı ve ihale stok limiti zorunludur.');
+      setError('İhale adı ve ihale toplam stoğu zorunludur.');
       return;
     }
 
-    await addItem({
+    if (needsTender && (!addPersonnelId || !addDocumentNo)) {
+      setError('İhale başlangıç stoğu girişi için personel ve evrak no zorunludur.');
+      return;
+    }
+
+    const newItemId = await addItem({
       name: newItemName,
       unit: unit,
       measurementUnit: newItemUnit,
@@ -101,11 +116,35 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       } : {})
     });
     
+    if (needsTender && tenderLimit) {
+      await addTransaction({
+        itemId: newItemId as number,
+        unit: unit,
+        type: 'GİRİŞ',
+        quantity: Number(tenderLimit),
+        date: Date.now(),
+        personnelId: Number(addPersonnelId),
+        description: 'İhale Başlangıç Stoğu',
+        documentNo: addDocumentNo
+      });
+
+      printMuayeneKabul({
+        itemName: newItemName,
+        quantity: tenderLimit,
+        measurementUnit: newItemUnit,
+        documentNo: addDocumentNo,
+        personnelName: personnelMap[Number(addPersonnelId)],
+        date: Date.now()
+      });
+    }
+
     setNewItemName('');
     setNewItemUnit('Adet');
     setTenderName('');
     setTenderEndDate('');
     setTenderLimit('');
+    setAddPersonnelId('');
+    setAddDocumentNo('');
     loadData();
   };
 
@@ -127,13 +166,15 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     let newHistory = editingItem.tenderHistory ? [...editingItem.tenderHistory] : [];
     let newPreviousTenderStock = editingItem.previousTenderStock || 0;
 
+    let isNewTender = false;
+
     if (needsTender) {
       if (!editTenderName || !editTenderLimit) {
-        alert('İhale adı ve ihale stok limiti zorunludur.');
+        alert('İhale adı ve ihale toplam stoğu zorunludur.');
         return;
       }
       
-      const isNewTender = editingItem.tenderName && editTenderName && editingItem.tenderName !== editTenderName;
+      isNewTender = !!(editingItem.tenderName && editTenderName && editingItem.tenderName !== editTenderName);
 
       if (!isNewTender && editingItem.tenderLimit && Number(editTenderLimit) > editingItem.tenderLimit) {
         alert('Mevcut ihalede belirtilen stok miktarı arttırılamaz. Yeni ihale yapılması gerekmektedir (İhale adını değiştirerek yeni ihale tanımlayabilirsiniz).');
@@ -142,7 +183,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       
       const changes: string[] = [];
       if (editingItem.tenderName !== editTenderName) changes.push(`İhale Adı: ${editingItem.tenderName} -> ${editTenderName}`);
-      if (editingItem.tenderLimit !== Number(editTenderLimit)) changes.push(`Limit: ${editingItem.tenderLimit} -> ${editTenderLimit}`);
+      if (editingItem.tenderLimit !== Number(editTenderLimit)) changes.push(`Toplam Stok: ${editingItem.tenderLimit} -> ${editTenderLimit}`);
       
       const oldDate = editingItem.tenderEndDate ? format(editingItem.tenderEndDate, 'yyyy-MM-dd') : '';
       if (oldDate !== editTenderEndDate) changes.push(`Tarih: ${oldDate} -> ${editTenderEndDate}`);
@@ -152,6 +193,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           alert('İhale bilgilerinde değişiklik yapmak için işlemi yapan personeli seçmeli ve onay kutusunu işaretlemelisiniz.');
           return;
         }
+        if (isNewTender && !editDocumentNo) {
+          alert('Yeni ihale stoğu girişi için Evrak No zorunludur.');
+          return;
+        }
+
         const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
         if (!selectedPersonnel) return;
         
@@ -182,7 +228,30 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       } : {})
     });
 
+    if (needsTender && isNewTender) {
+      await addTransaction({
+        itemId: editingItem.id!,
+        unit: unit,
+        type: 'GİRİŞ',
+        quantity: Number(editTenderLimit),
+        date: Date.now(),
+        personnelId: Number(editPersonnelId),
+        description: 'Yeni İhale Stoğu',
+        documentNo: editDocumentNo
+      });
+
+      printMuayeneKabul({
+        itemName: editName,
+        quantity: editTenderLimit,
+        measurementUnit: editUnit,
+        documentNo: editDocumentNo,
+        personnelName: personnelMap[Number(editPersonnelId)],
+        date: Date.now()
+      });
+    }
+
     setEditingItem(null);
+    setEditDocumentNo('');
     loadData();
   };
 
@@ -204,21 +273,22 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   const handleSubmitBulkTender = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkTenderName) {
-      alert('İhale adı zorunludur.');
+    if (!bulkTenderName || !bulkPersonnelId || !bulkDocumentNo) {
+      alert('İhale adı, personel ve evrak no zorunludur.');
       return;
     }
     
     for (const item of bulkItems) {
       if (!item.name || !item.limit) {
-        alert('Tüm ürünlerin adı ve limiti girilmelidir.');
+        alert('Tüm ürünlerin adı ve toplam stoğu girilmelidir.');
         return;
       }
     }
 
     try {
+      const addedItemsForPrint = [];
       for (const item of bulkItems) {
-        await addItem({
+        const newItemId = await addItem({
           name: item.name,
           unit: unit,
           measurementUnit: item.unit,
@@ -227,11 +297,38 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           tenderEndDate: bulkTenderEndDate ? new Date(bulkTenderEndDate).getTime() : undefined,
           tenderLimit: Number(item.limit)
         });
+
+        await addTransaction({
+          itemId: newItemId as number,
+          unit: unit,
+          type: 'GİRİŞ',
+          quantity: Number(item.limit),
+          date: Date.now(),
+          personnelId: Number(bulkPersonnelId),
+          description: 'İhale Başlangıç Stoğu',
+          documentNo: bulkDocumentNo
+        });
+
+        addedItemsForPrint.push({
+          itemName: item.name,
+          quantity: item.limit,
+          measurementUnit: item.unit
+        });
       }
+
+      printBulkMuayeneKabul({
+        items: addedItemsForPrint,
+        documentNo: bulkDocumentNo,
+        personnelName: personnelMap[Number(bulkPersonnelId)],
+        date: Date.now()
+      });
+
       setShowTenderModal(false);
       setBulkTenderName('');
       setBulkTenderEndDate('');
       setBulkItems([{ name: '', unit: 'Adet', limit: '' }]);
+      setBulkPersonnelId('');
+      setBulkDocumentNo('');
       loadData();
     } catch (err) {
       console.error(err);
@@ -293,6 +390,81 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <td>${data.quantity}</td>
               <td>${data.measurementUnit}</td>
             </tr>
+          </tbody>
+        </table>
+        <div class="signatures">
+          <div class="sig-box"><p><strong>Komisyon Başkanı</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Üye</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Üye</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Teslim Alan</strong></p><br><br><p>${data.personnelName}</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Gıda Mühendisi</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+        </div>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const printBulkMuayeneKabul = (data: { items: any[], documentNo: string, personnelName: string, date: number }) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const dateStr = format(data.date, 'dd.MM.yyyy');
+    
+    const html = `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Muayene Kabul Tutanağı</title>
+        <style>
+          body { font-family: 'Times New Roman', Times, serif; margin: 40px; color: #000; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { font-size: 16px; margin: 5px 0; font-weight: bold; }
+          .header h2 { font-size: 14px; margin: 5px 0; font-weight: normal; }
+          .title { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 30px; font-size: 16px; }
+          .content { text-align: justify; margin-bottom: 40px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
+          th { background-color: #f2f2f2; }
+          .signatures { display: flex; justify-content: space-between; flex-wrap: wrap; margin-top: 50px; }
+          .sig-box { width: 30%; text-align: center; margin-bottom: 40px; }
+          .sig-box p { margin: 5px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>T.C.</h1>
+          <h1>EDİRNE VALİLİĞİ</h1>
+          <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
+        </div>
+        <div class="title">MUAYENE VE KABUL TUTANAĞI</div>
+        <div class="content">
+          Vakfımız ${unit} birimi ihtiyacı için alımı yapılan ve aşağıda cinsi, miktarı belirtilen malzeme/ürünler muayene ve kabul komisyonumuz tarafından incelenmiş olup, evsafına ve şartnamesine uygun olduğu görülerek tam ve eksiksiz olarak teslim alınmıştır. İşbu tutanak tarafımızdan imza altına alınmıştır.
+          <br><br>
+          <strong>Tarih:</strong> ${dateStr}<br>
+          <strong>Evrak/Fatura No:</strong> ${data.documentNo}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Sıra</th>
+              <th>Malzeme/Ürün Adı</th>
+              <th>Miktarı</th>
+              <th>Birimi</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.items.map((item, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${item.itemName}</td>
+                <td>${item.quantity}</td>
+                <td>${item.measurementUnit}</td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
         <div class="signatures">
@@ -466,33 +638,59 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               </div>
               
               {needsTender && (
-                <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-md border border-gray-200">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">İhale Adı</label>
-                    <input
-                      type="text"
-                      value={tenderName}
-                      onChange={(e) => setTenderName(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                    />
+                <div className="space-y-4 bg-gray-50 p-3 rounded-md border border-gray-200">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700">İhale Adı</label>
+                      <input
+                        type="text"
+                        value={tenderName}
+                        onChange={(e) => setTenderName(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700">Geçerlilik Tarihi</label>
+                      <input
+                        type="date"
+                        value={tenderEndDate}
+                        onChange={(e) => setTenderEndDate(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700">İhale Toplam Stoğu</label>
+                      <input
+                        type="number"
+                        value={tenderLimit}
+                        onChange={(e) => setTenderLimit(e.target.value ? Number(e.target.value) : '')}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Geçerlilik Tarihi</label>
-                    <input
-                      type="date"
-                      value={tenderEndDate}
-                      onChange={(e) => setTenderEndDate(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">İhale Stok Limiti</label>
-                    <input
-                      type="number"
-                      value={tenderLimit}
-                      onChange={(e) => setTenderLimit(e.target.value ? Number(e.target.value) : '')}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
-                    />
+                  <div className="grid grid-cols-2 gap-4 border-t border-gray-200 pt-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700">İşlemi Yapan Personel</label>
+                      <select
+                        value={addPersonnelId}
+                        onChange={(e) => setAddPersonnelId(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                      >
+                        <option value="">Seçiniz...</option>
+                        {personnel.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700">Evrak No</label>
+                      <input
+                        type="text"
+                        value={addDocumentNo}
+                        onChange={(e) => setAddDocumentNo(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -559,7 +757,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                           )}
                           {item.tenderLimit && (
                             <div className="text-xs text-gray-400 mt-1">
-                              Limit: {item.tenderLimit}
+                              Toplam Stok: {item.tenderLimit}
                             </div>
                           )}
                         </td>
@@ -593,9 +791,10 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   <select
                     value={txType}
                     onChange={(e) => setTxType(e.target.value as 'GİRİŞ' | 'ÇIKIŞ')}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                    disabled={needsTender}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border disabled:bg-gray-100 disabled:text-gray-500"
                   >
-                    <option value="GİRİŞ">GİRİŞ</option>
+                    {!needsTender && <option value="GİRİŞ">GİRİŞ</option>}
                     <option value="ÇIKIŞ">ÇIKIŞ</option>
                   </select>
                 </div>
@@ -769,10 +968,10 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         <input type="date" value={editTenderEndDate} onChange={e => setEditTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">İhale Stok Limiti</label>
+                        <label className="block text-sm font-medium text-gray-700">İhale Toplam Stoğu</label>
                         <input type="number" required value={editTenderLimit} onChange={e => setEditTenderLimit(e.target.value ? Number(e.target.value) : '')} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
                         {editingItem.tenderLimit && (
-                          <p className="text-xs text-red-500 mt-1">Mevcut limit: {editingItem.tenderLimit}. Limit arttırılamaz.</p>
+                          <p className="text-xs text-red-500 mt-1">Mevcut toplam stok: {editingItem.tenderLimit}. Stok miktarı arttırılamaz.</p>
                         )}
                       </div>
                     </div>
@@ -796,6 +995,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                             ))}
                           </select>
                         </div>
+                        {(editTenderName !== editingItem.tenderName) && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Evrak No</label>
+                            <input type="text" required value={editDocumentNo} onChange={e => setEditDocumentNo(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                          </div>
+                        )}
                         <div className="flex items-start">
                           <div className="flex items-center h-5">
                             <input id="confirm" type="checkbox" required checked={editConfirm} onChange={e => setEditConfirm(e.target.checked)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded" />
@@ -877,6 +1082,22 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4 mb-6 bg-gray-50 p-3 rounded-md border border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">İşlemi Yapan Personel</label>
+                  <select required value={bulkPersonnelId} onChange={e => setBulkPersonnelId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                    <option value="">Seçiniz...</option>
+                    {personnel.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Evrak No</label>
+                  <input type="text" required value={bulkDocumentNo} onChange={e => setBulkDocumentNo(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+              </div>
+
               <div className="flex justify-between items-center mb-2">
                 <h4 className="text-md font-medium text-gray-800">İhale Ürünleri</h4>
                 <button type="button" onClick={handleAddBulkItemRow} className="text-sm text-red-600 hover:text-red-800 flex items-center font-medium">
@@ -903,7 +1124,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                       </select>
                     </div>
                     <div className="w-32">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">İhale Limiti</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Toplam Stok</label>
                       <input type="number" required value={item.limit} onChange={e => handleBulkItemChange(index, 'limit', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
                     </div>
                     <div className="pt-5">

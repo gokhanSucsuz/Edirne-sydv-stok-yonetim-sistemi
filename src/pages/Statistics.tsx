@@ -273,7 +273,7 @@ export default function Statistics() {
               <th>İhale Adı</th>
               <th>Geçerlilik Tarihi</th>
               <th>Önceki İhaleden Devreden</th>
-              <th>İhale Limiti</th>
+              <th>İhale Toplam Stoğu</th>
               <th>Mevcut Toplam Stok</th>
             </tr>
           </thead>
