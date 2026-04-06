@@ -279,9 +279,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   };
 
   const handleBulkItemChange = (index: number, field: string, value: string) => {
-    const newItems = [...bulkItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setBulkItems(newItems);
+    setBulkItems(prev => {
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return newItems;
+    });
   };
 
   const handleSubmitBulkTender = async (e: React.FormEvent) => {
