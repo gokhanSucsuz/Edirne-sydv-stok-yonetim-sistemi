@@ -84,6 +84,26 @@ export default function Statistics() {
     const dateStr = format(new Date(), 'dd.MM.yyyy');
     const reportTitle = `${reportType === 'daily' ? 'GÜNLÜK' : reportType === 'weekly' ? 'HAFTALIK' : 'AYLIK'} STOK İŞLEM RAPORU`;
 
+    // Calculate Stock Summary
+    const stockSummary = items.filter(item => reportUnit === 'Tümü' || item.unit === reportUnit).map(item => {
+      const itemTxs = filteredTxs.filter(tx => tx.itemId === item.id);
+      const totalIn = itemTxs.filter(tx => tx.type === 'GİRİŞ').reduce((sum, tx) => sum + tx.quantity, 0);
+      const totalOut = itemTxs.filter(tx => tx.type === 'ÇIKIŞ').reduce((sum, tx) => sum + tx.quantity, 0);
+      
+      // Devreden (Previous Month) = Current Stock - Total In + Total Out
+      // This assumes the report is run up to the current date.
+      const previousStock = item.currentStock - totalIn + totalOut;
+      
+      return {
+        name: item.name,
+        unit: item.measurementUnit,
+        previousStock,
+        totalIn,
+        totalOut,
+        currentStock: item.currentStock
+      };
+    });
+
     const html = `
       <!DOCTYPE html>
       <html lang="tr">
@@ -121,9 +141,38 @@ export default function Statistics() {
         </div>
 
         <p style="font-size: 12px; text-indent: 30px; text-align: justify;">
-          Vakfımız ${reportUnit !== 'Tümü' ? reportUnit + ' birimi' : 'tüm birimleri'} kapsamında ${format(startDate, 'dd.MM.yyyy')} - ${dateStr} tarihleri arasında gerçekleştirilen stok giriş ve çıkış işlemleri aşağıda tablo halinde sunulmuştur.
+          Vakfımız ${reportUnit !== 'Tümü' ? reportUnit + ' birimi' : 'tüm birimleri'} kapsamında ${format(startDate, 'dd.MM.yyyy')} - ${dateStr} tarihleri arasında gerçekleştirilen stok icmal (özet) durumu ve detaylı işlem dökümü aşağıda sunulmuştur. Kalan stoklar bir sonraki döneme devretmiştir.
         </p>
 
+        <div style="font-weight: bold; margin-bottom: 10px; font-size: 13px;">1. STOK İCMAL (ÖZET) TABLOSU</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Sıra</th>
+              <th>Malzeme Adı</th>
+              <th>Önceki Dönemden Devreden</th>
+              <th>Dönem İçi Giren</th>
+              <th>Dönem İçi Çıkan</th>
+              <th>Sonraki Döneme Devreden (Kalan)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stockSummary.length === 0 ? '<tr><td colspan="6" style="text-align:center;">Kayıtlı malzeme bulunmamaktadır.</td></tr>' : 
+              stockSummary.map((item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${item.name}</td>
+                  <td>${item.previousStock} ${item.unit}</td>
+                  <td>${item.totalIn} ${item.unit}</td>
+                  <td>${item.totalOut} ${item.unit}</td>
+                  <td><strong>${item.currentStock} ${item.unit}</strong></td>
+                </tr>
+              `).join('')
+            }
+          </tbody>
+        </table>
+
+        <div style="font-weight: bold; margin-bottom: 10px; font-size: 13px;">2. DETAYLI İŞLEM DÖKÜMÜ</div>
         <table>
           <thead>
             <tr>

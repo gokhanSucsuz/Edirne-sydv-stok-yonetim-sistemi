@@ -18,6 +18,9 @@ export interface Item {
   measurementUnit: string;
   currentStock: number;
   createdAt: number;
+  tenderName?: string;
+  tenderEndDate?: number;
+  tenderLimit?: number;
 }
 
 export interface Transaction {
@@ -150,8 +153,14 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
   if (!item) throw new Error('Item not found');
 
   if (tx.type === 'GİRİŞ') {
+    if (item.tenderLimit && (item.currentStock + tx.quantity > item.tenderLimit)) {
+      throw new Error(`İhale limitini aşamazsınız! Maksimum eklenebilecek miktar: ${item.tenderLimit - item.currentStock}`);
+    }
     item.currentStock += tx.quantity;
   } else if (tx.type === 'ÇIKIŞ') {
+    if (item.currentStock === 0) {
+      throw new Error('Stok bitti! İşlem yapılamaz.');
+    }
     if (item.currentStock < tx.quantity) {
       throw new Error('Yetersiz stok!');
     }
@@ -159,6 +168,7 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
   }
 
   await itemStore.put(item);
-  await txStore.add(tx);
+  const txId = await txStore.add(tx);
   await txDb.done;
+  return txId;
 }

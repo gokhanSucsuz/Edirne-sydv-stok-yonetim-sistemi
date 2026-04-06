@@ -25,6 +25,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   // New Item Form
   const [newItemName, setNewItemName] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('Adet');
+  const [tenderName, setTenderName] = useState('');
+  const [tenderEndDate, setTenderEndDate] = useState('');
+  const [tenderLimit, setTenderLimit] = useState<number | ''>('');
+  
+  const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(unit);
   
   // New Transaction Form
   const [txItemId, setTxItemId] = useState<number | ''>('');
@@ -62,12 +67,91 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       name: newItemName,
       unit: unit,
       measurementUnit: newItemUnit,
-      currentStock: 0
+      currentStock: 0,
+      ...(needsTender && tenderName ? {
+        tenderName,
+        tenderEndDate: tenderEndDate ? new Date(tenderEndDate).getTime() : undefined,
+        tenderLimit: tenderLimit ? Number(tenderLimit) : undefined
+      } : {})
     });
     
     setNewItemName('');
     setNewItemUnit('Adet');
+    setTenderName('');
+    setTenderEndDate('');
+    setTenderLimit('');
     loadData();
+  };
+
+  const printMuayeneKabul = (data: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const dateStr = format(data.date, 'dd.MM.yyyy');
+    const html = `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Muayene Kabul Tutanağı</title>
+        <style>
+          body { font-family: 'Times New Roman', Times, serif; margin: 40px; color: #000; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { font-size: 16px; margin: 5px 0; font-weight: bold; }
+          .header h2 { font-size: 14px; margin: 5px 0; font-weight: normal; }
+          .title { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 30px; font-size: 16px; }
+          .content { text-align: justify; margin-bottom: 40px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
+          th { background-color: #f2f2f2; }
+          .signatures { display: flex; justify-content: space-between; flex-wrap: wrap; margin-top: 50px; }
+          .sig-box { width: 30%; text-align: center; margin-bottom: 40px; }
+          .sig-box p { margin: 5px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>T.C.</h1>
+          <h1>EDİRNE VALİLİĞİ</h1>
+          <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
+        </div>
+        <div class="title">MUAYENE VE KABUL TUTANAĞI</div>
+        <div class="content">
+          Vakfımız ${unit} birimi ihtiyacı için alımı yapılan ve aşağıda cinsi, miktarı belirtilen malzeme/ürünler muayene ve kabul komisyonumuz tarafından incelenmiş olup, evsafına ve şartnamesine uygun olduğu görülerek tam ve eksiksiz olarak teslim alınmıştır. İşbu tutanak tarafımızdan imza altına alınmıştır.
+          <br><br>
+          <strong>Tarih:</strong> ${dateStr}<br>
+          <strong>Evrak/Fatura No:</strong> ${data.documentNo}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Sıra</th>
+              <th>Malzeme/Ürün Adı</th>
+              <th>Miktarı</th>
+              <th>Birimi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>${data.itemName}</td>
+              <td>${data.quantity}</td>
+              <td>${data.measurementUnit}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="signatures">
+          <div class="sig-box"><p><strong>Komisyon Başkanı</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Üye</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Üye</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Teslim Alan</strong></p><br><br><p>${data.personnelName}</p><p>İmza</p></div>
+          <div class="sig-box"><p><strong>Gıda Mühendisi</strong></p><br><br><p>Adı Soyadı</p><p>İmza</p></div>
+        </div>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const handleAddTransaction = async (e: React.FormEvent) => {
@@ -89,6 +173,17 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         description: txDescription,
         documentNo: txDocumentNo
       });
+
+      if (txType === 'GİRİŞ') {
+        printMuayeneKabul({
+          itemName: itemMap[Number(txItemId)]?.name,
+          quantity: txQuantity,
+          measurementUnit: itemMap[Number(txItemId)]?.measurementUnit,
+          documentNo: txDocumentNo,
+          personnelName: personnelMap[Number(txPersonnelId)],
+          date: Date.now()
+        });
+      }
 
       setTxQuantity('');
       setTxDescription('');
@@ -135,38 +230,75 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         <div className="space-y-6">
           <div className="bg-white shadow sm:rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Yeni Stok Kalemi Ekle</h3>
-            <form onSubmit={handleAddItem} className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">Malzeme Adı</label>
-                <input
-                  type="text"
-                  required
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                />
+            <form onSubmit={handleAddItem} className="space-y-4">
+              <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700">Malzeme Adı</label>
+                  <input
+                    type="text"
+                    required
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="block text-sm font-medium text-gray-700">Birim</label>
+                  <select
+                    value={newItemUnit}
+                    onChange={(e) => setNewItemUnit(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                  >
+                    <option>Adet</option>
+                    <option>Kg</option>
+                    <option>Litre</option>
+                    <option>Koli</option>
+                    <option>Paket</option>
+                    <option>Çuval</option>
+                  </select>
+                </div>
               </div>
-              <div className="w-32">
-                <label className="block text-sm font-medium text-gray-700">Birim</label>
-                <select
-                  value={newItemUnit}
-                  onChange={(e) => setNewItemUnit(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+              
+              {needsTender && (
+                <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-md border border-gray-200">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">İhale Adı</label>
+                    <input
+                      type="text"
+                      value={tenderName}
+                      onChange={(e) => setTenderName(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">Geçerlilik Tarihi</label>
+                    <input
+                      type="date"
+                      value={tenderEndDate}
+                      onChange={(e) => setTenderEndDate(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">İhale Stok Limiti</label>
+                    <input
+                      type="number"
+                      value={tenderLimit}
+                      onChange={(e) => setTenderLimit(e.target.value ? Number(e.target.value) : '')}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1.5 border"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >
-                  <option>Adet</option>
-                  <option>Kg</option>
-                  <option>Litre</option>
-                  <option>Koli</option>
-                  <option>Paket</option>
-                  <option>Çuval</option>
-                </select>
+                  <Plus className="w-4 h-4 mr-2" /> Ekle
+                </button>
               </div>
-              <button
-                type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Ekle
-              </button>
             </form>
           </div>
 
@@ -188,11 +320,29 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   ) : (
                     items.map((item) => (
                       <tr key={item.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {item.name}
+                          {item.tenderName && (
+                            <div className="text-xs text-gray-500 font-normal mt-1">
+                              İhale: {item.tenderName} 
+                              {item.tenderEndDate && ` (Bitiş: ${format(item.tenderEndDate, 'dd.MM.yyyy')})`}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <span className={`font-bold ${item.currentStock <= 0 ? 'text-red-600' : 'text-green-600'}`}>
                             {item.currentStock}
                           </span> {item.measurementUnit}
+                          {item.currentStock <= 0 && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                              Stok Bitti
+                            </span>
+                          )}
+                          {item.tenderLimit && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Limit: {item.tenderLimit}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
