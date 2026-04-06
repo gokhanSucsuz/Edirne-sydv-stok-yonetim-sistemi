@@ -152,9 +152,14 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
   const item = await itemStore.get(tx.itemId);
   if (!item) throw new Error('Item not found');
 
+  const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(item.unit);
+  if (needsTender && (!item.tenderName || !item.tenderLimit)) {
+    throw new Error('İhale bilgisi girilmeden stok işlemi yapılamaz.');
+  }
+
   if (tx.type === 'GİRİŞ') {
-    if (item.tenderLimit && (item.currentStock + tx.quantity > item.tenderLimit)) {
-      throw new Error(`İhale limitini aşamazsınız! Maksimum eklenebilecek miktar: ${item.tenderLimit - item.currentStock}`);
+    if (needsTender && item.tenderLimit && (item.currentStock + tx.quantity > item.tenderLimit)) {
+      throw new Error(`İhale limitini aşamazsınız! Maksimum eklenebilecek miktar: ${item.tenderLimit - item.currentStock}. Yeni ihale yapılması gerekmektedir.`);
     }
     item.currentStock += tx.quantity;
   } else if (tx.type === 'ÇIKIŞ') {

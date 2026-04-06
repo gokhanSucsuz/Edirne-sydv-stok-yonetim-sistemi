@@ -8,9 +8,10 @@ import {
   getTransactionsByUnit, 
   getPersonnel, 
   addItem, 
-  addTransaction 
+  addTransaction,
+  updateItem
 } from '../lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface UnitPanelProps {
@@ -40,6 +41,14 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [txDocumentNo, setTxDocumentNo] = useState('');
   const [error, setError] = useState('');
 
+  // Edit Item Form
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+  const [editTenderName, setEditTenderName] = useState('');
+  const [editTenderEndDate, setEditTenderEndDate] = useState('');
+  const [editTenderLimit, setEditTenderLimit] = useState<number | ''>('');
+
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel] = await Promise.all([
       getItemsByUnit(unit),
@@ -61,8 +70,14 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     if (!newItemName || !newItemUnit) return;
     
+    if (needsTender && (!tenderName || !tenderLimit)) {
+      setError('İhale adı ve ihale stok limiti zorunludur.');
+      return;
+    }
+
     await addItem({
       name: newItemName,
       unit: unit,
@@ -80,6 +95,45 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setTenderName('');
     setTenderEndDate('');
     setTenderLimit('');
+    loadData();
+  };
+
+  const openEditModal = (item: Item) => {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditUnit(item.measurementUnit);
+    setEditTenderName(item.tenderName || '');
+    setEditTenderEndDate(item.tenderEndDate ? format(item.tenderEndDate, 'yyyy-MM-dd') : '');
+    setEditTenderLimit(item.tenderLimit || '');
+  };
+
+  const handleUpdateItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    if (needsTender) {
+      if (!editTenderName || !editTenderLimit) {
+        alert('İhale adı ve ihale stok limiti zorunludur.');
+        return;
+      }
+      if (editingItem.tenderLimit && Number(editTenderLimit) > editingItem.tenderLimit) {
+        alert('İhalede belirtilen stok miktarı arttırılamaz. Yeni ihale yapılması gerekmektedir.');
+        return;
+      }
+    }
+
+    await updateItem({
+      ...editingItem,
+      name: editName,
+      measurementUnit: editUnit,
+      ...(needsTender ? {
+        tenderName: editTenderName,
+        tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
+        tenderLimit: Number(editTenderLimit)
+      } : {})
+    });
+
+    setEditingItem(null);
     loadData();
   };
 
@@ -159,6 +213,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setError('');
     if (!txItemId || !txQuantity || !txPersonnelId || !txDocumentNo) {
       setError('Lütfen zorunlu alanları doldurun.');
+      return;
+    }
+
+    const selectedItem = itemMap[Number(txItemId)];
+    if (needsTender && (!selectedItem.tenderName || !selectedItem.tenderLimit)) {
+      setError('Bu malzeme için ihale bilgisi girilmeden işlem yapılamaz. Lütfen önce malzemeyi düzenleyerek ihale bilgilerini girin.');
       return;
     }
 
@@ -312,6 +372,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Malzeme</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miktar</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -343,6 +404,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                               Limit: {item.tenderLimit}
                             </div>
                           )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button onClick={() => openEditModal(item)} className="text-indigo-600 hover:text-indigo-900">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -509,6 +575,55 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Malzeme / İhale Düzenle</h3>
+            <form onSubmit={handleUpdateItem} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Malzeme Adı</label>
+                <input type="text" required value={editName} onChange={e => setEditName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Birim</label>
+                <select value={editUnit} onChange={e => setEditUnit(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                  <option>Adet</option>
+                  <option>Kg</option>
+                  <option>Litre</option>
+                  <option>Koli</option>
+                  <option>Paket</option>
+                  <option>Çuval</option>
+                </select>
+              </div>
+              {needsTender && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">İhale Adı</label>
+                    <input type="text" required value={editTenderName} onChange={e => setEditTenderName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
+                    <input type="date" value={editTenderEndDate} onChange={e => setEditTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">İhale Stok Limiti</label>
+                    <input type="number" required value={editTenderLimit} onChange={e => setEditTenderLimit(e.target.value ? Number(e.target.value) : '')} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                    {editingItem.tenderLimit && (
+                      <p className="text-xs text-red-500 mt-1">Mevcut limit: {editingItem.tenderLimit}. Limit arttırılamaz.</p>
+                    )}
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end space-x-3 mt-6">
+                <button type="button" onClick={() => setEditingItem(null)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
+                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Kaydet</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
