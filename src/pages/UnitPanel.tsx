@@ -87,6 +87,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editTenderConfirm, setEditTenderConfirm] = useState(false);
   const [allowTenderHeaderEdit, setAllowTenderHeaderEdit] = useState(false);
 
+  const isTenderExpired = (item: Item) => {
+    if (!item.tenderEndDate) return false;
+    return item.tenderEndDate < Date.now();
+  };
+
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel, loadedMasterItems] = await Promise.all([
       getItemsByUnit(unit),
@@ -830,10 +835,10 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">
                           <div className="flex items-center">
                             {item.name}
-                            {item.tenderLimit && item.currentStock < Math.max(item.tenderLimit * 0.1, 2) && (
-                              <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
+                            {item.currentStock <= 0 && (
+                              <AlertCircle className="w-4 h-4 text-red-600 ml-2" title="Stok Bitti" />
                             )}
-                            {!item.tenderLimit && item.currentStock < 2 && (
+                            {item.currentStock > 0 && item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2) && (
                               <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
                             )}
                           </div>
@@ -849,12 +854,23 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className={`font-bold ${item.currentStock <= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          <span className={`font-bold ${
+                            item.currentStock <= 0 
+                            ? 'text-red-600' 
+                            : item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2)
+                            ? 'text-yellow-600'
+                            : 'text-green-600'
+                          }`}>
                             {item.currentStock}
                           </span> {item.measurementUnit}
                           {item.currentStock <= 0 && (
                             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                               Stok Bitti
+                            </span>
+                          )}
+                          {item.currentStock > 0 && item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2) && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Kritik Seviye
                             </span>
                           )}
                           {item.tenderLimit && (
@@ -1111,11 +1127,26 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">İhale Adı</label>
-                        <input type="text" required value={editTenderName} onChange={e => setEditTenderName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                        <input 
+                          type="text" 
+                          required 
+                          disabled={true}
+                          value={editTenderName} 
+                          onChange={e => setEditTenderName(e.target.value)} 
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border bg-gray-100 text-gray-500 cursor-not-allowed" 
+                        />
+                        <p className="text-[10px] text-blue-600 mt-1">* İhale adı sadece "İhale Yönetimi" sayfasından değiştirilebilir.</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
-                        <input type="date" value={editTenderEndDate} onChange={e => setEditTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                        <input 
+                          type="date" 
+                          disabled={true}
+                          value={editTenderEndDate} 
+                          onChange={e => setEditTenderEndDate(e.target.value)} 
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border bg-gray-100 text-gray-500 cursor-not-allowed" 
+                        />
+                        <p className="text-[10px] text-blue-600 mt-1">* İhale tarihi sadece "İhale Yönetimi" sayfasından değiştirilebilir.</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">İhale Toplam Stoğu</label>
@@ -1165,9 +1196,31 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   )}
                 </>
               )}
+              {isTenderExpired(editingItem) && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                  <div className="flex">
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700 font-bold">
+                        BU İHALENİN SÜRESİ DOLMUŞTUR!
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">
+                        Süresi dolan ihalelerde değişiklik yapılamaz ve silinemez.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button type="button" onClick={() => setEditingItem(null)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
-                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Kaydet</button>
+                <button 
+                  type="submit" 
+                  disabled={isTenderExpired(editingItem)}
+                  className={`px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${isTenderExpired(editingItem) ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+                >
+                  Kaydet
+                </button>
               </div>
             </form>
           </div>

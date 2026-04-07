@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getPersonnel, getAllItems, getAllTransactions, getMasterItems, Personnel, Item, Transaction, UnitType } from '../lib/db';
 import { Link } from 'react-router-dom';
-import { Package, ArrowDownRight, ArrowUpRight, Users, PackageOpen, AlertTriangle, Droplets, Utensils, Home, Gift, Building2 } from 'lucide-react';
+import { Package, ArrowDownRight, ArrowUpRight, Users, PackageOpen, AlertTriangle, AlertCircle, Droplets, Utensils, Home, Gift, Building2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 
 const UNITS: UnitType[] = ['Vefa Temizlik', 'Aşevi', 'Dergah', 'Bağış', 'Vakıf'];
@@ -18,6 +18,7 @@ interface UnitStats {
   name: UnitType;
   itemCount: number;
   lowStockCount: number;
+  zeroStockCount: number;
   transactionCount: number;
 }
 
@@ -56,7 +57,9 @@ export default function Dashboard() {
       const stats: UnitStats[] = UNITS.map(unit => {
         const unitItems = items.filter(i => i.unit === unit);
         const unitTxs = txs.filter(t => t.unit === unit);
+        const zeroStock = unitItems.filter(i => i.currentStock <= 0);
         const lowStock = unitItems.filter(i => {
+          if (i.currentStock <= 0) return false;
           const threshold = i.tenderLimit ? Math.max(i.tenderLimit * 0.1, 2) : 2;
           return i.currentStock < threshold;
         });
@@ -64,6 +67,7 @@ export default function Dashboard() {
         return {
           name: unit,
           itemCount: unitItems.length,
+          zeroStockCount: zeroStock.length,
           lowStockCount: lowStock.length,
           transactionCount: unitTxs.length
         };
@@ -112,7 +116,7 @@ export default function Dashboard() {
       </div>
 
       {/* Top Stats */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
         <div className="bg-white p-5 shadow rounded-lg flex items-center">
           <div className="p-3 bg-red-100 rounded-full">
             <Users className="h-6 w-6 text-red-600" />
@@ -150,11 +154,20 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="bg-white p-5 shadow rounded-lg flex items-center">
+          <div className="p-3 bg-red-100 rounded-full">
+            <AlertCircle className="h-6 w-6 text-red-600" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-500">Biten Stok</p>
+            <p className="text-2xl font-semibold text-gray-900">{unitStats.reduce((acc, s) => acc + s.zeroStockCount, 0)}</p>
+          </div>
+        </div>
+        <div className="bg-white p-5 shadow rounded-lg flex items-center">
           <div className="p-3 bg-yellow-100 rounded-full">
             <AlertTriangle className="h-6 w-6 text-yellow-600" />
           </div>
           <div className="ml-4">
-            <p className="text-sm font-medium text-gray-500">Düşük Stok Uyarısı</p>
+            <p className="text-sm font-medium text-gray-500">Kritik Stok</p>
             <p className="text-2xl font-semibold text-gray-900">{unitStats.reduce((acc, s) => acc + s.lowStockCount, 0)}</p>
           </div>
         </div>
@@ -226,12 +239,20 @@ export default function Dashboard() {
                 <div className="p-2 bg-gray-50 rounded-lg">
                   <Icon className="h-6 w-6 text-gray-600" />
                 </div>
-                {stats.lowStockCount > 0 && (
-                  <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    {stats.lowStockCount} Uyarı
-                  </span>
-                )}
+                <div className="flex flex-col space-y-1">
+                  {stats.zeroStockCount > 0 && (
+                    <span className="bg-red-100 text-red-800 text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center">
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      {stats.zeroStockCount} Bitti
+                    </span>
+                  )}
+                  {stats.lowStockCount > 0 && (
+                    <span className="bg-yellow-100 text-yellow-800 text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      {stats.lowStockCount} Kritik
+                    </span>
+                  )}
+                </div>
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-4">{stats.name}</h3>
               <div className="space-y-3">

@@ -70,8 +70,18 @@ export default function TenderManagement() {
     loadData();
   }, []);
 
+  const isExpired = (endDate?: number) => {
+    if (!endDate) return false;
+    return endDate < Date.now();
+  };
+
   const handleOpenEdit = (tender: TenderGroup) => {
-    if (!window.confirm(`"${tender.tenderName}" ihalesini düzenlemek istediğinize emin misiniz?`)) return;
+    if (isExpired(tender.endDate)) {
+      alert(`"${tender.tenderName}" ihalesinin süresi dolduğu için üzerinde değişiklik yapılamaz veya silinemez.`);
+      // We still allow opening it to view, but we'll disable buttons in the modal
+    } else {
+      if (!window.confirm(`"${tender.tenderName}" ihalesini düzenlemek istediğinize emin misiniz?`)) return;
+    }
     
     setEditingTender(tender);
     setEditTenderName(tender.tenderName);
@@ -211,14 +221,16 @@ export default function TenderManagement() {
                     <Package className="w-4 h-4 mr-2" />
                     {tender.items.length} Kalem Ürün
                   </div>
-                  <div className="flex items-center">
+                  <div className={`flex items-center ${isExpired(tender.endDate) ? 'text-red-600 font-bold' : ''}`}>
                     <Calendar className="w-4 h-4 mr-2" />
                     {tender.endDate ? format(tender.endDate, 'dd.MM.yyyy') : 'Belirtilmemiş'}
+                    {isExpired(tender.endDate) && <span className="ml-2 text-[10px] uppercase tracking-wider bg-red-100 px-1 rounded">Süresi Doldu</span>}
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-                  <span className="text-red-600 text-sm font-medium flex items-center group-hover:underline">
-                    <Edit2 className="w-4 h-4 mr-1" /> Düzenle
+                  <span className={`${isExpired(tender.endDate) ? 'text-gray-400' : 'text-red-600'} text-sm font-medium flex items-center group-hover:underline`}>
+                    {isExpired(tender.endDate) ? <Search className="w-4 h-4 mr-1" /> : <Edit2 className="w-4 h-4 mr-1" />} 
+                    {isExpired(tender.endDate) ? 'Görüntüle' : 'Düzenle'}
                   </span>
                 </div>
               </div>
@@ -233,12 +245,29 @@ export default function TenderManagement() {
           <div className="bg-white rounded-lg p-6 max-w-5xl w-full shadow-xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">İhaleyi Düzenle: {editTenderName}</h3>
-              <button onClick={handleDelete} className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center">
-                <X className="w-4 h-4 mr-1" /> İhaleyi Sil
-              </button>
+              {!isExpired(editingTender.endDate) && (
+                <button onClick={handleDelete} className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center">
+                  <X className="w-4 h-4 mr-1" /> İhaleyi Sil
+                </button>
+              )}
             </div>
             
             <form onSubmit={handleSubmitEdit} className="flex flex-col flex-1 overflow-hidden">
+              {isExpired(editingTender.endDate) && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                  <div className="flex">
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700 font-bold">
+                        BU İHALENİN SÜRESİ DOLMUŞTUR!
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">
+                        Süresi dolan ihalelerde değişiklik yapılamaz ve silinemez.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="bg-blue-50 p-4 rounded-md border border-blue-200 mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
@@ -335,8 +364,10 @@ export default function TenderManagement() {
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
-                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Değişiklikleri Kaydet</button>
+                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Kapat</button>
+                {!isExpired(editingTender.endDate) && (
+                  <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Değişiklikleri Kaydet</button>
+                )}
               </div>
             </form>
           </div>
