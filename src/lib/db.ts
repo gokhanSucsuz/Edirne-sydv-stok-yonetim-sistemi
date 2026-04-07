@@ -242,3 +242,15 @@ export async function deleteMasterItem(id: number) {
   const db = await initDB();
   return db.delete('masterItems', id);
 }
+
+export async function checkDocumentNoExists(documentNo: string) {
+  const db = await initDB();
+  const txs = await db.getAll('transactions');
+  return txs.some(tx => tx.documentNo === documentNo);
+}
+
+export function generateUniqueDocNo(prefix: string = 'EVR') {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `${prefix}-${timestamp}-${random}`;
+}

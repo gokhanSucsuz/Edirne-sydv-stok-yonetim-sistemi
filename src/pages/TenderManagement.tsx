@@ -8,7 +8,9 @@ import {
   deleteItem,
   addItem,
   addTransaction,
-  UnitType
+  UnitType,
+  generateUniqueDocNo,
+  checkDocumentNoExists
 } from '../lib/db';
 import { format } from 'date-fns';
 import { PackageOpen, Edit2, X, AlertCircle, Search, Building2, Calendar, Package, Plus } from 'lucide-react';
@@ -34,6 +36,7 @@ export default function TenderManagement() {
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderItems, setEditTenderItems] = useState<Item[]>([]);
   const [editPersonnelId, setEditPersonnelId] = useState('');
+  const [editDocumentNo, setEditDocumentNo] = useState(generateUniqueDocNo());
   const [editConfirm, setEditConfirm] = useState(false);
   const [allowHeaderEdit, setAllowHeaderEdit] = useState(false);
 
@@ -90,6 +93,7 @@ export default function TenderManagement() {
     setEditTenderEndDate(tender.endDate ? format(tender.endDate, 'yyyy-MM-dd') : '');
     setEditTenderItems([...tender.items]);
     setEditPersonnelId('');
+    setEditDocumentNo(generateUniqueDocNo());
     setEditConfirm(false);
     setAllowHeaderEdit(false);
     setShowEditModal(true);
@@ -136,8 +140,14 @@ export default function TenderManagement() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editPersonnelId || !editConfirm) {
-      alert('İşlemi yapan personeli seçmeli ve onay kutusunu işaretlemelisiniz.');
+    if (!editPersonnelId || !editConfirm || !editDocumentNo) {
+      alert('İşlemi yapan personeli seçmeli, evrak no girmeli ve onay kutusunu işaretlemelisiniz.');
+      return;
+    }
+
+    const docExists = await checkDocumentNoExists(editDocumentNo);
+    if (docExists) {
+      alert('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
       return;
     }
 
@@ -208,7 +218,7 @@ export default function TenderManagement() {
             date: Date.now(),
             personnelId: Number(editPersonnelId),
             description: 'İhaleye Sonradan Eklenen Ürün Stoğu',
-            documentNo: 'YENİ-EKLEME'
+            documentNo: editDocumentNo
           });
         }
       }
@@ -442,8 +452,8 @@ export default function TenderManagement() {
               </div>
 
               <div className="mt-6 p-4 bg-yellow-50 rounded-md border border-yellow-200">
-                <div className="flex items-center mb-4">
-                  <div className="flex-1">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">Değişikliği Onaylayan Personel</label>
                     <select required value={editPersonnelId} onChange={e => setEditPersonnelId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
                       <option value="">Seçiniz...</option>
@@ -451,6 +461,10 @@ export default function TenderManagement() {
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Evrak No</label>
+                    <input type="text" required value={editDocumentNo} onChange={e => setEditDocumentNo(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
                   </div>
                 </div>
                 <div className="flex items-center">

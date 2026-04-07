@@ -12,7 +12,9 @@ import {
   updateItem,
   deleteItem,
   getMasterItems,
-  MasterItem
+  MasterItem,
+  checkDocumentNoExists,
+  generateUniqueDocNo
 } from '../lib/db';
 import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen, FileText, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
@@ -38,7 +40,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [tenderEndDate, setTenderEndDate] = useState('');
   const [tenderLimit, setTenderLimit] = useState<number | ''>('');
   const [addPersonnelId, setAddPersonnelId] = useState('');
-  const [addDocumentNo, setAddDocumentNo] = useState('');
+  const [addDocumentNo, setAddDocumentNo] = useState(generateUniqueDocNo());
   
   const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(unit);
   
@@ -48,7 +50,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [txQuantity, setTxQuantity] = useState<number | ''>('');
   const [txPersonnelId, setTxPersonnelId] = useState<number | ''>('');
   const [txDescription, setTxDescription] = useState('');
-  const [txDocumentNo, setTxDocumentNo] = useState('');
+  const [txDocumentNo, setTxDocumentNo] = useState(generateUniqueDocNo());
   const [error, setError] = useState('');
 
   // Edit Item Form
@@ -59,7 +61,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderLimit, setEditTenderLimit] = useState<number | ''>('');
   const [editPersonnelId, setEditPersonnelId] = useState('');
-  const [editDocumentNo, setEditDocumentNo] = useState('');
+  const [editDocumentNo, setEditDocumentNo] = useState(generateUniqueDocNo());
   const [editConfirm, setEditConfirm] = useState(false);
 
   // History Modal
@@ -70,7 +72,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [bulkTenderName, setBulkTenderName] = useState('');
   const [bulkTenderEndDate, setBulkTenderEndDate] = useState('');
   const [bulkPersonnelId, setBulkPersonnelId] = useState('');
-  const [bulkDocumentNo, setBulkDocumentNo] = useState('');
+  const [bulkDocumentNo, setBulkDocumentNo] = useState(generateUniqueDocNo());
   const [bulkTenderType, setBulkTenderType] = useState<'İhale' | 'Bağış'>('İhale');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
 
@@ -78,7 +80,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [showBulkExitModal, setShowBulkExitModal] = useState(false);
   const [bulkExitItems, setBulkExitItems] = useState<{ itemId: number | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
   const [bulkExitPersonnelId, setBulkExitPersonnelId] = useState('');
-  const [bulkExitDocumentNo, setBulkExitDocumentNo] = useState('');
+  const [bulkExitDocumentNo, setBulkExitDocumentNo] = useState(generateUniqueDocNo());
   const [bulkExitDescription, setBulkExitDescription] = useState('');
 
   // Edit Tender Modal
@@ -142,6 +144,14 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       return;
     }
 
+    if (addDocumentNo) {
+      const exists = await checkDocumentNoExists(addDocumentNo);
+      if (exists) {
+        setError('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
+        return;
+      }
+    }
+
     const newItemId = await addItem({
       name: newItemName,
       unit: unit,
@@ -182,7 +192,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setTenderEndDate('');
     setTenderLimit('');
     setAddPersonnelId('');
-    setAddDocumentNo('');
+    setAddDocumentNo(generateUniqueDocNo());
     loadData();
   };
 
@@ -234,6 +244,14 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         if (isNewTender && !editDocumentNo) {
           alert('Yeni ihale stoğu girişi için Evrak No zorunludur.');
           return;
+        }
+
+        if (editDocumentNo) {
+          const exists = await checkDocumentNoExists(editDocumentNo);
+          if (exists) {
+            alert('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
+            return;
+          }
         }
 
         const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
@@ -289,7 +307,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
 
     setEditingItem(null);
-    setEditDocumentNo('');
+    setEditDocumentNo(generateUniqueDocNo());
     loadData();
   };
 
@@ -331,6 +349,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     e.preventDefault();
     if (!bulkExitPersonnelId || !bulkExitDocumentNo) {
       alert('Personel ve evrak no zorunludur.');
+      return;
+    }
+
+    const docExists = await checkDocumentNoExists(bulkExitDocumentNo);
+    if (docExists) {
+      alert('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
       return;
     }
 
@@ -384,7 +408,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       setShowBulkExitModal(false);
       setBulkExitItems([{ itemId: '', quantity: '' }]);
       setBulkExitPersonnelId('');
-      setBulkExitDocumentNo('');
+      setBulkExitDocumentNo(generateUniqueDocNo());
       setBulkExitDescription('');
       loadData();
       alert('Toplu stok çıkışı başarıyla tamamlandı.');
@@ -484,6 +508,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       alert('İhale adı, personel ve evrak no zorunludur.');
       return;
     }
+
+    const docExists = await checkDocumentNoExists(bulkDocumentNo);
+    if (docExists) {
+      alert('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
+      return;
+    }
     
     for (const item of bulkItems) {
       if (!item.name || !item.limit) {
@@ -536,7 +566,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       setBulkTenderEndDate('');
       setBulkItems([{ name: '', unit: 'Adet', limit: '' }]);
       setBulkPersonnelId('');
-      setBulkDocumentNo('');
+      setBulkDocumentNo(generateUniqueDocNo());
       loadData();
     } catch (err) {
       console.error(err);
@@ -702,6 +732,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       return;
     }
 
+    const docExists = await checkDocumentNoExists(txDocumentNo);
+    if (docExists) {
+      setError('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
+      return;
+    }
+
     const selectedItem = itemMap[Number(txItemId)];
     if (needsTender && (!selectedItem.tenderName || !selectedItem.tenderLimit)) {
       setError('Bu malzeme için ihale bilgisi girilmeden işlem yapılamaz. Lütfen önce malzemeyi düzenleyerek ihale bilgilerini girin.');
@@ -763,7 +799,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
       setTxQuantity('');
       setTxDescription('');
-      setTxDocumentNo('');
+      setTxDocumentNo(generateUniqueDocNo());
       loadData();
     } catch (err: any) {
       setError(err.message || 'İşlem sırasında bir hata oluştu.');
