@@ -98,6 +98,35 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     return item.tenderEndDate < Date.now();
   };
 
+  interface GroupedItem {
+    name: string;
+    totalStock: number;
+    totalLimit: number;
+    measurementUnit: string;
+    unit: string;
+    tenders: Item[];
+  }
+
+  // Group items by name for display
+  const groupedItems = items.reduce((acc, item) => {
+    if (!acc[item.name]) {
+      acc[item.name] = {
+        name: item.name,
+        totalStock: 0,
+        totalLimit: 0,
+        measurementUnit: item.measurementUnit,
+        unit: item.unit,
+        tenders: []
+      };
+    }
+    acc[item.name].totalStock += item.currentStock;
+    acc[item.name].totalLimit += (item.tenderLimit || 0);
+    acc[item.name].tenders.push(item);
+    return acc;
+  }, {} as Record<string, GroupedItem>);
+
+  const groupedList: GroupedItem[] = Object.values(groupedItems);
+
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel, loadedMasterItems] = await Promise.all([
       getItemsByUnit(unit),
@@ -920,80 +949,85 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {items.filter(i => i.currentStock > 0).length === 0 ? (
+                  {groupedList.filter(g => g.totalStock > 0).length === 0 ? (
                     <tr><td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">Mevcut stokta malzeme bulunmuyor.</td></tr>
                   ) : (
-                    items.filter(i => i.currentStock > 0).map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                          <div className="flex items-center">
-                            {item.name}
-                            {item.currentStock > 0 && item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2) && (
-                              <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
+                    groupedList.filter(g => g.totalStock > 0).map((group) => {
+                      const isLowStock = group.totalStock < (group.totalLimit ? Math.max(group.totalLimit * 0.1, 2) : 2);
+                      const mainItem = group.tenders[0]; // Use first item for general info
+                      
+                      return (
+                        <tr key={group.name}>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            <div className="flex items-center">
+                              {group.name}
+                              {isLowStock && (
+                                <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-1">
+                              {group.tenders.filter(t => t.currentStock > 0).map(t => (
+                                <div 
+                                  key={t.id}
+                                  className="text-[10px] text-blue-600 font-normal cursor-pointer hover:underline flex items-center"
+                                  onClick={() => setHistoryItem(t)}
+                                >
+                                  {t.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {t.tenderName} 
+                                  {t.tenderEndDate && ` (Bitiş: ${format(t.tenderEndDate, 'dd.MM.yyyy')})`}
+                                  <span className="ml-1 text-gray-400">({t.currentStock} {t.measurementUnit})</span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className={`font-bold ${isLowStock ? 'text-yellow-600' : 'text-green-600'}`}>
+                              {group.totalStock}
+                            </span> {group.measurementUnit}
+                            {isLowStock && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                Kritik Seviye
+                              </span>
                             )}
-                          </div>
-                          {item.tenderName && (
-                            <div 
-                              className="text-xs text-blue-600 font-normal mt-1 cursor-pointer hover:underline flex items-center"
-                              onClick={() => setHistoryItem(item)}
-                              title="İhale değişiklik geçmişini görmek için tıklayın"
-                            >
-                              {item.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {item.tenderName} 
-                              {item.tenderEndDate && ` (Bitiş: ${format(item.tenderEndDate, 'dd.MM.yyyy')})`}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className={`font-bold ${
-                            item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2)
-                            ? 'text-yellow-600'
-                            : 'text-green-600'
-                          }`}>
-                            {item.currentStock}
-                          </span> {item.measurementUnit}
-                          {item.currentStock > 0 && item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2) && (
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                              Kritik Seviye
-                            </span>
-                          )}
-                          {item.tenderLimit && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              Toplam Stok: {item.tenderLimit}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
-                            <button
-                              onClick={() => {
-                                const related = items.filter(i => i.name === item.name);
-                                generateItemReport(item, related, transactions, personnel, 'all');
-                              }}
-                              className="text-blue-600 hover:text-blue-900 flex items-center"
-                              title="PDF Rapor Al"
-                            >
-                              <FileText className="w-4 h-4 mr-1" /> Rapor
-                            </button>
-                            <button
-                              onClick={() => setEditingItem(item)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                              title="Tekli Düzenle"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            {item.tenderName && (
+                            {group.totalLimit > 0 && (
+                              <div className="text-xs text-gray-400 mt-1">
+                                Toplam Limit: {group.totalLimit}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex justify-end space-x-2">
                               <button
-                                onClick={() => handleOpenEditTender(item.tenderName!)}
-                                className="text-blue-600 hover:text-blue-900"
-                                title="İhaleyi Toplu Düzenle"
+                                onClick={() => {
+                                  const related = items.filter(i => i.name === group.name);
+                                  generateItemReport(mainItem, related, transactions, personnel, 'all');
+                                }}
+                                className="text-blue-600 hover:text-blue-900 flex items-center"
+                                title="PDF Rapor Al"
                               >
-                                <PackageOpen className="w-4 h-4" />
+                                <FileText className="w-4 h-4 mr-1" /> Rapor
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              <div className="relative group/edit">
+                                <button className="text-indigo-600 hover:text-indigo-900 p-1">
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover/edit:block border border-gray-200">
+                                  <div className="px-3 py-1 text-xs font-bold text-gray-500 border-b">Düzenlenecek İhale Seçin:</div>
+                                  {group.tenders.map(t => (
+                                    <button
+                                      key={t.id}
+                                      onClick={() => setEditingItem(t)}
+                                      className="block w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-100"
+                                    >
+                                      {t.tenderName} ({t.currentStock})
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1017,45 +1051,60 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {items.filter(i => i.currentStock <= 0).length === 0 ? (
+                  {groupedList.filter(g => g.totalStock <= 0).length === 0 ? (
                     <tr><td colSpan={2} className="px-6 py-4 text-center text-sm text-gray-500">Biten stok bulunmuyor.</td></tr>
                   ) : (
-                    items.filter(i => i.currentStock <= 0).map((item) => (
-                      <tr key={item.id} className="bg-red-50/30">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                          <div className="flex items-center">
-                            {item.name}
-                            <AlertCircle className="w-4 h-4 text-red-600 ml-2" title="Stok Bitti" />
-                          </div>
-                          {item.tenderName && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {item.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {item.tenderName}
+                    groupedList.filter(g => g.totalStock <= 0).map((group) => {
+                      const mainItem = group.tenders[0];
+                      return (
+                        <tr key={group.name} className="bg-red-50/30">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            <div className="flex items-center">
+                              {group.name}
+                              <AlertCircle className="w-4 h-4 text-red-600 ml-2" title="Stok Bitti" />
                             </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
-                            <button
-                              onClick={() => {
-                                const related = items.filter(i => i.name === item.name);
-                                generateItemReport(item, related, transactions, personnel, 'all');
-                              }}
-                              className="text-blue-600 hover:text-blue-900 flex items-center"
-                              title="PDF Rapor Al"
-                            >
-                              <FileText className="w-4 h-4 mr-1" /> Rapor
-                            </button>
-                            <button
-                              onClick={() => setEditingItem(item)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                              title="Tekli Düzenle"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                            <div className="mt-1 space-y-1">
+                              {group.tenders.map(t => (
+                                <div key={t.id} className="text-[10px] text-gray-500">
+                                  {t.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {t.tenderName}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex justify-end space-x-2">
+                              <button
+                                onClick={() => {
+                                  const related = items.filter(i => i.name === group.name);
+                                  generateItemReport(mainItem, related, transactions, personnel, 'all');
+                                }}
+                                className="text-blue-600 hover:text-blue-900 flex items-center"
+                                title="PDF Rapor Al"
+                              >
+                                <FileText className="w-4 h-4 mr-1" /> Rapor
+                              </button>
+                              <div className="relative group/edit">
+                                <button className="text-indigo-600 hover:text-indigo-900 p-1">
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover/edit:block border border-gray-200">
+                                  <div className="px-3 py-1 text-xs font-bold text-gray-500 border-b">Düzenlenecek İhale Seçin:</div>
+                                  {group.tenders.map(t => (
+                                    <button
+                                      key={t.id}
+                                      onClick={() => setEditingItem(t)}
+                                      className="block w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-100"
+                                    >
+                                      {t.tenderName}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
