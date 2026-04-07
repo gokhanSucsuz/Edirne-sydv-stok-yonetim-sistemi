@@ -19,6 +19,7 @@ import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '../constants';
 
 const navigation = [
   { name: 'Gösterge Paneli', href: '/', icon: LayoutDashboard },
+  { name: 'İhale Yönetimi', href: '/tenders', icon: PackageOpen },
   { name: 'Malzeme Tanımları', href: '/master-items', icon: PackageOpen },
   { name: 'Personel Yönetimi', href: '/personnel', icon: Users },
   { name: 'Vefa Temizlik', href: '/unit/vefa', icon: Droplets },

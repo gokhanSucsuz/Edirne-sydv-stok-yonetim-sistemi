@@ -24,6 +24,7 @@ interface UnitStats {
 export default function Dashboard() {
   const [personnelCount, setPersonnelCount] = useState(0);
   const [masterItemsCount, setMasterItemsCount] = useState(0);
+  const [tendersCount, setTendersCount] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [personnelMap, setPersonnelMap] = useState<Record<number, string>>({});
   const [unitStats, setUnitStats] = useState<UnitStats[]>([]);
@@ -43,6 +44,10 @@ export default function Dashboard() {
       const items = await getAllItems();
       const mItems = await getMasterItems();
       setMasterItemsCount(mItems.length);
+
+      // Count unique tenders
+      const uniqueTenders = new Set(items.filter(i => i.tenderName).map(i => `${i.tenderName}-${i.unit}`));
+      setTendersCount(uniqueTenders.size);
 
       const txs = await getAllTransactions();
       setRecentTransactions(txs.sort((a, b) => b.date - a.date).slice(0, 5));
@@ -117,6 +122,15 @@ export default function Dashboard() {
             <p className="text-2xl font-semibold text-gray-900">{personnelCount}</p>
           </div>
         </div>
+        <Link to="/tenders" className="bg-white p-5 shadow rounded-lg flex items-center hover:bg-gray-50 transition-colors">
+          <div className="p-3 bg-purple-100 rounded-full">
+            <PackageOpen className="h-6 w-6 text-purple-600" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-500">İhale Yönetimi</p>
+            <p className="text-2xl font-semibold text-gray-900">{tendersCount}</p>
+          </div>
+        </Link>
         <div className="bg-white p-5 shadow rounded-lg flex items-center">
           <div className="p-3 bg-blue-100 rounded-full">
             <PackageOpen className="h-6 w-6 text-blue-600" />
