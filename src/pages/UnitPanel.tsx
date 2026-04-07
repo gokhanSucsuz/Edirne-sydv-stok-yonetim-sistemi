@@ -60,6 +60,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editTenderName, setEditTenderName] = useState('');
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderLimit, setEditTenderLimit] = useState<number | ''>('');
+  const [editTenderType, setEditTenderType] = useState<'İhale' | 'Bağış'>('İhale');
   const [editPersonnelId, setEditPersonnelId] = useState('');
   const [editDocumentNo, setEditDocumentNo] = useState(generateUniqueDocNo());
   const [editConfirm, setEditConfirm] = useState(false);
@@ -203,6 +204,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     setEditTenderName(item.tenderName || '');
     setEditTenderEndDate(item.tenderEndDate ? format(item.tenderEndDate, 'yyyy-MM-dd') : '');
     setEditTenderLimit(item.tenderLimit || '');
+    setEditTenderType(item.tenderType || 'İhale');
     setEditPersonnelId('');
     setEditConfirm(false);
   };
@@ -918,17 +920,14 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {items.length === 0 ? (
-                    <tr><td colSpan={2} className="px-6 py-4 text-center text-sm text-gray-500">Kayıtlı malzeme bulunmuyor.</td></tr>
+                  {items.filter(i => i.currentStock > 0).length === 0 ? (
+                    <tr><td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">Mevcut stokta malzeme bulunmuyor.</td></tr>
                   ) : (
-                    items.map((item) => (
+                    items.filter(i => i.currentStock > 0).map((item) => (
                       <tr key={item.id}>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">
                           <div className="flex items-center">
                             {item.name}
-                            {item.currentStock <= 0 && (
-                              <AlertCircle className="w-4 h-4 text-red-600 ml-2" title="Stok Bitti" />
-                            )}
                             {item.currentStock > 0 && item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2) && (
                               <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
                             )}
@@ -939,26 +938,19 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                               onClick={() => setHistoryItem(item)}
                               title="İhale değişiklik geçmişini görmek için tıklayın"
                             >
-                              İhale: {item.tenderName} 
+                              {item.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {item.tenderName} 
                               {item.tenderEndDate && ` (Bitiş: ${format(item.tenderEndDate, 'dd.MM.yyyy')})`}
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <span className={`font-bold ${
-                            item.currentStock <= 0 
-                            ? 'text-red-600' 
-                            : item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2)
+                            item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2)
                             ? 'text-yellow-600'
                             : 'text-green-600'
                           }`}>
                             {item.currentStock}
                           </span> {item.measurementUnit}
-                          {item.currentStock <= 0 && (
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                              Stok Bitti
-                            </span>
-                          )}
                           {item.currentStock > 0 && item.currentStock < (item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2) && (
                             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                               Kritik Seviye
@@ -998,6 +990,68 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                                 <PackageOpen className="w-4 h-4" />
                               </button>
                             )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Biten Stoklar Bölümü */}
+          <div className="bg-white shadow sm:rounded-lg overflow-hidden">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-red-50">
+              <h3 className="text-lg font-medium text-red-800 flex items-center">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                Biten Stoklar
+              </h3>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Malzeme</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {items.filter(i => i.currentStock <= 0).length === 0 ? (
+                    <tr><td colSpan={2} className="px-6 py-4 text-center text-sm text-gray-500">Biten stok bulunmuyor.</td></tr>
+                  ) : (
+                    items.filter(i => i.currentStock <= 0).map((item) => (
+                      <tr key={item.id} className="bg-red-50/30">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <div className="flex items-center">
+                            {item.name}
+                            <AlertCircle className="w-4 h-4 text-red-600 ml-2" title="Stok Bitti" />
+                          </div>
+                          {item.tenderName && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {item.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {item.tenderName}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={() => {
+                                const related = items.filter(i => i.name === item.name);
+                                generateItemReport(item, related, transactions, personnel, 'all');
+                              }}
+                              className="text-blue-600 hover:text-blue-900 flex items-center"
+                              title="PDF Rapor Al"
+                            >
+                              <FileText className="w-4 h-4 mr-1" /> Rapor
+                            </button>
+                            <button
+                              onClick={() => setEditingItem(item)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Tekli Düzenle"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1254,6 +1308,17 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         />
                         <p className="text-[10px] text-blue-600 mt-1">* İhale adı sadece "İhale Yönetimi" sayfasından değiştirilebilir.</p>
                       </div>
+                      {unit === 'Dergah' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Kayıt Türü</label>
+                          <input 
+                            type="text" 
+                            disabled={true}
+                            value={editTenderType} 
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border bg-gray-100 text-gray-500 cursor-not-allowed" 
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Geçerlilik Tarihi</label>
                         <input 
