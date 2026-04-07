@@ -963,6 +963,19 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 </div>
               </div>
 
+              {txType === 'ÇIKIŞ' && txItemId && txQuantity && (
+                <div className={`p-3 rounded-md border flex justify-between items-center ${
+                  (itemMap[Number(txItemId)]?.currentStock - Number(txQuantity)) < 0 
+                  ? 'bg-red-50 border-red-200 text-red-700' 
+                  : 'bg-green-50 border-green-200 text-green-700'
+                }`}>
+                  <span className="text-sm font-medium">İşlem Sonrası Kalan Stok:</span>
+                  <span className="text-lg font-bold">
+                    {(itemMap[Number(txItemId)]?.currentStock - Number(txQuantity)).toFixed(2)} {itemMap[Number(txItemId)]?.measurementUnit}
+                  </span>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Resmi Evrak No</label>
@@ -1031,6 +1044,11 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                           <p>
                             Miktar: <span className="font-medium text-gray-900">{tx.quantity} {itemMap[tx.itemId]?.measurementUnit}</span>
                           </p>
+                          {tx.remainingStock !== undefined && (
+                            <p className="mt-2 sm:mt-0 sm:ml-6">
+                              Kalan Stok: <span className="font-medium text-gray-900">{tx.remainingStock} {itemMap[tx.itemId]?.measurementUnit}</span>
+                            </p>
+                          )}
                           <p className="mt-2 sm:mt-0 sm:ml-6">
                             Personel: {personnelMap[tx.personnelId] || '-'}
                           </p>
@@ -1337,6 +1355,18 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                     <div className="w-32">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Miktar</label>
                       <input type="number" required min="0.01" step="0.01" value={item.quantity} onChange={e => handleBulkExitItemChange(index, 'quantity', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Kalan Stok</label>
+                      <div className={`block w-full rounded-md sm:text-sm p-2 border font-bold ${
+                        item.itemId && item.quantity && (itemMap[Number(item.itemId)]?.currentStock - Number(item.quantity)) < 0 
+                        ? 'bg-red-50 border-red-300 text-red-600' 
+                        : 'bg-green-50 border-green-300 text-green-600'
+                      }`}>
+                        {item.itemId && item.quantity 
+                          ? (itemMap[Number(item.itemId)]?.currentStock - Number(item.quantity)).toFixed(2) 
+                          : '-'}
+                      </div>
                     </div>
                     <div className="pt-5">
                       <button type="button" onClick={() => handleRemoveBulkExitRow(index)} disabled={bulkExitItems.length === 1} className="text-gray-400 hover:text-red-600 disabled:opacity-50">

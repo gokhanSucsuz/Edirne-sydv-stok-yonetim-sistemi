@@ -38,6 +38,7 @@ export interface Transaction {
   unit: UnitType;
   type: TransactionType;
   quantity: number;
+  remainingStock: number;
   date: number;
   personnelId: number;
   description: string;
@@ -167,7 +168,7 @@ export async function getAllTransactions() {
   return db.getAll('transactions');
 }
 
-export async function addTransaction(tx: Omit<Transaction, 'id'>) {
+export async function addTransaction(tx: Omit<Transaction, 'id' | 'remainingStock'>) {
   const db = await initDB();
   
   // Start a transaction to update both item stock and add transaction record
@@ -211,7 +212,7 @@ export async function addTransaction(tx: Omit<Transaction, 'id'>) {
   }
 
   await itemStore.put(item);
-  const txId = await txStore.add(tx);
+  const txId = await txStore.add({ ...tx, remainingStock: item.currentStock });
   await txDb.done;
   return txId;
 }
