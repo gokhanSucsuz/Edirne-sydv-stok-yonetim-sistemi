@@ -310,6 +310,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         tenderName: editTenderName,
         tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
         tenderLimit: Number(editTenderLimit),
+        tenderType: editTenderType,
         tenderHistory: newHistory,
         previousTenderStock: newPreviousTenderStock
       } : {})
@@ -394,10 +395,13 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         alert('Tüm satırlar için malzeme ve miktar girilmelidir.');
         return;
       }
-      const stockItem = items.find(i => i.id === Number(item.itemId));
-      if (stockItem && stockItem.currentStock < Number(item.quantity)) {
-        alert(`${stockItem.name} için yetersiz stok. Mevcut: ${stockItem.currentStock}`);
-        return;
+      const masterItem = items.find(i => i.id === Number(item.itemId));
+      if (masterItem) {
+        const totalStock = groupedItems[masterItem.name]?.totalStock || 0;
+        if (totalStock < Number(item.quantity)) {
+          alert(`${masterItem.name} için yetersiz toplam stok. Mevcut: ${totalStock} ${masterItem.measurementUnit}`);
+          return;
+        }
       }
     }
 
@@ -564,7 +568,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           tenderName: bulkTenderName,
           tenderEndDate: bulkTenderEndDate ? new Date(bulkTenderEndDate).getTime() : undefined,
           tenderLimit: Number(item.limit),
-          tenderType: unit === 'Dergah' ? bulkTenderType : 'İhale'
+          tenderType: bulkTenderType
         });
 
         await addTransaction({
@@ -574,7 +578,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           quantity: Number(item.limit),
           date: Date.now(),
           personnelId: Number(bulkPersonnelId),
-          description: unit === 'Dergah' ? `${bulkTenderType} Başlangıç Stoğu` : 'İhale Başlangıç Stoğu',
+          description: `${bulkTenderType} Başlangıç Stoğu`,
           documentNo: bulkDocumentNo
         });
 
@@ -775,10 +779,17 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       return;
     }
 
+    const totalStockForProduct = groupedItems[selectedItem.name]?.totalStock || 0;
+
     try {
       if (txType === 'ÇIKIŞ') {
         const quantityToExit = Number(txQuantity);
         
+        if (totalStockForProduct < quantityToExit) {
+          setError(`Yetersiz toplam stok! Mevcut: ${totalStockForProduct} ${selectedItem.measurementUnit}`);
+          return;
+        }
+
         // FIFO Logic: Find all items with same name in this unit, sort by createdAt
         const sameItems = items
           .filter(i => i.name === selectedItem.name && i.currentStock > 0)
@@ -847,10 +858,13 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     return acc;
   }, {} as Record<number, Item>);
 
-  const lowStockItems = items.filter(item => {
-    const threshold = item.tenderLimit ? Math.max(item.tenderLimit * 0.1, 2) : 2;
-    return item.currentStock < threshold;
+  const lowStockItems = groupedList.filter(group => {
+    if (group.totalStock <= 0) return false;
+    const threshold = group.totalLimit ? Math.max(group.totalLimit * 0.1, 2) : 2;
+    return group.totalStock < threshold;
   });
+
+  const isNewTender = editingItem && (editTenderName !== editingItem.tenderName);
 
   return (
     <div className="space-y-6">
@@ -869,8 +883,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <div className="mt-2 text-sm text-yellow-700">
                 <ul className="list-disc pl-5 space-y-1">
                   {lowStockItems.map(item => (
-                    <li key={item.id}>
-                      <strong>{item.name}</strong> kritik seviyede! Mevcut stok: {item.currentStock} {item.measurementUnit}
+                    <li key={item.name}>
+                      <strong>{item.name}</strong> kritik seviyede! Mevcut toplam stok: {item.totalStock} {item.measurementUnit}
                     </li>
                   ))}
                 </ul>
@@ -1203,13 +1217,13 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
               {txType === 'ÇIKIŞ' && txItemId && txQuantity && (
                 <div className={`p-3 rounded-md border flex justify-between items-center ${
-                  (itemMap[Number(txItemId)]?.currentStock - Number(txQuantity)) < 0 
+                  ((groupedItems[itemMap[Number(txItemId)]?.name]?.totalStock || 0) - Number(txQuantity)) < 0 
                   ? 'bg-red-50 border-red-200 text-red-700' 
                   : 'bg-green-50 border-green-200 text-green-700'
                 }`}>
-                  <span className="text-sm font-medium">İşlem Sonrası Kalan Stok:</span>
+                  <span className="text-sm font-medium">İşlem Sonrası Toplam Kalan Stok:</span>
                   <span className="text-lg font-bold">
-                    {(itemMap[Number(txItemId)]?.currentStock - Number(txQuantity)).toFixed(2)} {itemMap[Number(txItemId)]?.measurementUnit}
+                    {((groupedItems[itemMap[Number(txItemId)]?.name]?.totalStock || 0) - Number(txQuantity)).toFixed(2)} {itemMap[Number(txItemId)]?.measurementUnit}
                   </span>
                 </div>
               )}
@@ -1357,15 +1371,18 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         />
                         <p className="text-[10px] text-blue-600 mt-1">* İhale adı sadece "İhale Yönetimi" sayfasından değiştirilebilir.</p>
                       </div>
-                      {unit === 'Dergah' && (
+                      {needsTender && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Kayıt Türü</label>
-                          <input 
-                            type="text" 
-                            disabled={true}
-                            value={editTenderType} 
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border bg-gray-100 text-gray-500 cursor-not-allowed" 
-                          />
+                          <select
+                            value={editTenderType}
+                            onChange={e => setEditTenderType(e.target.value as 'İhale' | 'Bağış')}
+                            disabled={!isNewTender}
+                            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border ${!isNewTender ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
+                          >
+                            <option value="İhale">İhale</option>
+                            <option value="Bağış">Bağış</option>
+                          </select>
                         </div>
                       )}
                       <div>
@@ -1516,7 +1533,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 </div>
               </div>
 
-              {unit === 'Dergah' && (
+              {needsTender && (
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Kayıt Türü</label>
                   <div className="flex space-x-4">

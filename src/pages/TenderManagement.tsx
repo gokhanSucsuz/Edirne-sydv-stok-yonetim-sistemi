@@ -295,6 +295,9 @@ export default function TenderManagement() {
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     {tender.unit}
                   </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 bg-orange-100 text-orange-800">
+                    {tender.items[0]?.tenderType || 'İhale'}
+                  </span>
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2 truncate" title={tender.tenderName}>
                   {tender.tenderName}

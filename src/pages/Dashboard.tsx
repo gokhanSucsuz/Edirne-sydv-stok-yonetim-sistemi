@@ -57,16 +57,28 @@ export default function Dashboard() {
       const stats: UnitStats[] = UNITS.map(unit => {
         const unitItems = items.filter(i => i.unit === unit);
         const unitTxs = txs.filter(t => t.unit === unit);
-        const zeroStock = unitItems.filter(i => i.currentStock <= 0);
-        const lowStock = unitItems.filter(i => {
-          if (i.currentStock <= 0) return false;
-          const threshold = i.tenderLimit ? Math.max(i.tenderLimit * 0.1, 2) : 2;
-          return i.currentStock < threshold;
+        
+        // Group items by name within the unit to check total stock
+        const groupedByProduct = unitItems.reduce((acc, item) => {
+          if (!acc[item.name]) {
+            acc[item.name] = { totalStock: 0, totalLimit: 0 };
+          }
+          acc[item.name].totalStock += item.currentStock;
+          acc[item.name].totalLimit += (item.tenderLimit || 0);
+          return acc;
+        }, {} as Record<string, { totalStock: number, totalLimit: number }>);
+
+        const productValues = Object.values(groupedByProduct);
+        const zeroStock = productValues.filter(p => p.totalStock <= 0);
+        const lowStock = productValues.filter(p => {
+          if (p.totalStock <= 0) return false;
+          const threshold = p.totalLimit ? Math.max(p.totalLimit * 0.1, 2) : 2;
+          return p.totalStock < threshold;
         });
 
         return {
           name: unit,
-          itemCount: unitItems.length,
+          itemCount: Object.keys(groupedByProduct).length,
           zeroStockCount: zeroStock.length,
           lowStockCount: lowStock.length,
           transactionCount: unitTxs.length
