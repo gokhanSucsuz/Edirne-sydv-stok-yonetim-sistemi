@@ -14,10 +14,12 @@ import {
   getMasterItems,
   MasterItem
 } from '../lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen, FileText, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { APP_LOGO_URL } from '../constants';
 import { Link } from 'react-router-dom';
+import { generateItemReport } from '../lib/reports';
+import { cn } from '../lib/utils';
 
 interface UnitPanelProps {
   unit: UnitType;
@@ -69,6 +71,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [bulkTenderEndDate, setBulkTenderEndDate] = useState('');
   const [bulkPersonnelId, setBulkPersonnelId] = useState('');
   const [bulkDocumentNo, setBulkDocumentNo] = useState('');
+  const [bulkTenderType, setBulkTenderType] = useState<'İhale' | 'Bağış'>('İhale');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
 
   // Bulk Exit Modal
@@ -345,16 +348,37 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
     try {
       for (const item of bulkExitItems) {
-        await addTransaction({
-          itemId: Number(item.itemId),
-          unit: unit,
-          type: 'ÇIKIŞ',
-          quantity: Number(item.quantity),
-          date: Date.now(),
-          personnelId: Number(bulkExitPersonnelId),
-          description: bulkExitDescription || 'Toplu Stok Çıkışı',
-          documentNo: bulkExitDocumentNo
-        });
+        const quantityToExit = Number(item.quantity);
+        const masterItem = items.find(i => i.id === Number(item.itemId));
+        if (!masterItem) continue;
+
+        // FIFO Logic: Find all items with same name in this unit, sort by createdAt
+        const sameItems = items
+          .filter(i => i.name === masterItem.name && i.currentStock > 0)
+          .sort((a, b) => a.createdAt - b.createdAt);
+
+        let remainingToExit = quantityToExit;
+        for (const stockItem of sameItems) {
+          if (remainingToExit <= 0) break;
+          const takeFromThis = Math.min(stockItem.currentStock, remainingToExit);
+          
+          await addTransaction({
+            itemId: stockItem.id!,
+            unit: unit,
+            type: 'ÇIKIŞ',
+            quantity: takeFromThis,
+            date: Date.now(),
+            personnelId: Number(bulkExitPersonnelId),
+            description: bulkExitDescription || 'Toplu Stok Çıkışı (FIFO)',
+            documentNo: bulkExitDocumentNo
+          });
+
+          remainingToExit -= takeFromThis;
+        }
+
+        if (remainingToExit > 0) {
+          console.error(`Warning: Could not exit full quantity for ${masterItem.name}. Remaining: ${remainingToExit}`);
+        }
       }
 
       setShowBulkExitModal(false);
@@ -366,7 +390,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       alert('Toplu stok çıkışı başarıyla tamamlandı.');
     } catch (err) {
       console.error(err);
-      alert('İşlem sırasında bir hata oluştu.');
+      alert(err instanceof Error ? err.message : 'Bir hata oluştu.');
     }
   };
 
@@ -478,7 +502,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           currentStock: 0,
           tenderName: bulkTenderName,
           tenderEndDate: bulkTenderEndDate ? new Date(bulkTenderEndDate).getTime() : undefined,
-          tenderLimit: Number(item.limit)
+          tenderLimit: Number(item.limit),
+          tenderType: unit === 'Dergah' ? bulkTenderType : 'İhale'
         });
 
         await addTransaction({
@@ -488,7 +513,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           quantity: Number(item.limit),
           date: Date.now(),
           personnelId: Number(bulkPersonnelId),
-          description: 'İhale Başlangıç Stoğu',
+          description: unit === 'Dergah' ? `${bulkTenderType} Başlangıç Stoğu` : 'İhale Başlangıç Stoğu',
           documentNo: bulkDocumentNo
         });
 
@@ -684,18 +709,48 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
 
     try {
-      await addTransaction({
-        itemId: Number(txItemId),
-        unit: unit,
-        type: txType,
-        quantity: Number(txQuantity),
-        date: Date.now(),
-        personnelId: Number(txPersonnelId),
-        description: txDescription,
-        documentNo: txDocumentNo
-      });
+      if (txType === 'ÇIKIŞ') {
+        const quantityToExit = Number(txQuantity);
+        
+        // FIFO Logic: Find all items with same name in this unit, sort by createdAt
+        const sameItems = items
+          .filter(i => i.name === selectedItem.name && i.currentStock > 0)
+          .sort((a, b) => a.createdAt - b.createdAt);
 
-      if (txType === 'GİRİŞ') {
+        let remainingToExit = quantityToExit;
+        for (const stockItem of sameItems) {
+          if (remainingToExit <= 0) break;
+          const takeFromThis = Math.min(stockItem.currentStock, remainingToExit);
+          
+          await addTransaction({
+            itemId: stockItem.id!,
+            unit: unit,
+            type: 'ÇIKIŞ',
+            quantity: takeFromThis,
+            date: Date.now(),
+            personnelId: Number(txPersonnelId),
+            description: txDescription || 'Stok Çıkışı (FIFO)',
+            documentNo: txDocumentNo
+          });
+
+          remainingToExit -= takeFromThis;
+        }
+
+        if (remainingToExit > 0) {
+          throw new Error(`Yetersiz toplam stok! Kalan: ${remainingToExit}`);
+        }
+      } else {
+        await addTransaction({
+          itemId: Number(txItemId),
+          unit: unit,
+          type: txType,
+          quantity: Number(txQuantity),
+          date: Date.now(),
+          personnelId: Number(txPersonnelId),
+          description: txDescription,
+          documentNo: txDocumentNo
+        });
+
         printMuayeneKabul({
           itemName: itemMap[Number(txItemId)]?.name,
           quantity: txQuantity,
@@ -882,6 +937,16 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
                             <button
+                              onClick={() => {
+                                const related = items.filter(i => i.name === item.name);
+                                generateItemReport(item, related, transactions, personnel, 'all');
+                              }}
+                              className="text-blue-600 hover:text-blue-900 flex items-center"
+                              title="PDF Rapor Al"
+                            >
+                              <FileText className="w-4 h-4 mr-1" /> Rapor
+                            </button>
+                            <button
                               onClick={() => setEditingItem(item)}
                               className="text-indigo-600 hover:text-indigo-900"
                               title="Tekli Düzenle"
@@ -940,9 +1005,25 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
                   >
                     <option value="">Seçiniz...</option>
-                    {items.map(item => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
+                    {(() => {
+                      if (txType === 'ÇIKIŞ') {
+                        // For exits, show unique names
+                        const uniqueNames = Array.from(new Set(items.filter(i => i.currentStock > 0).map(i => i.name)));
+                        return uniqueNames.map(name => {
+                          const firstItem = items.find(i => i.name === name);
+                          const totalStock = items.filter(i => i.name === name).reduce((acc, i) => acc + i.currentStock, 0);
+                          return (
+                            <option key={name} value={firstItem?.id}>
+                              {name} (Toplam: {totalStock} {firstItem?.measurementUnit})
+                            </option>
+                          );
+                        });
+                      } else {
+                        return items.map(item => (
+                          <option key={item.id} value={item.id}>{item.name} {item.tenderName ? `(${item.tenderName})` : ''}</option>
+                        ));
+                      }
+                    })()}
                   </select>
                 </div>
               </div>
@@ -1284,6 +1365,22 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   <input type="date" value={bulkTenderEndDate} onChange={e => setBulkTenderEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
                 </div>
               </div>
+
+              {unit === 'Dergah' && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Kayıt Türü</label>
+                  <div className="flex space-x-4">
+                    <label className="flex items-center">
+                      <input type="radio" name="tenderType" value="İhale" checked={bulkTenderType === 'İhale'} onChange={() => setBulkTenderType('İhale')} className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300" />
+                      <span className="ml-2 text-sm text-gray-700">İhale</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input type="radio" name="tenderType" value="Bağış" checked={bulkTenderType === 'Bağış'} onChange={() => setBulkTenderType('Bağış')} className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300" />
+                      <span className="ml-2 text-sm text-gray-700">Bağış</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4 mb-6 bg-gray-50 p-3 rounded-md border border-gray-200">
                 <div>

@@ -6,10 +6,12 @@ import {
   getPersonnel, 
   updateItem, 
   deleteItem,
+  addItem,
+  addTransaction,
   UnitType
 } from '../lib/db';
 import { format } from 'date-fns';
-import { PackageOpen, Edit2, X, AlertCircle, Search, Building2, Calendar, Package } from 'lucide-react';
+import { PackageOpen, Edit2, X, AlertCircle, Search, Building2, Calendar, Package, Plus } from 'lucide-react';
 
 interface TenderGroup {
   tenderName: string;
@@ -99,6 +101,39 @@ export default function TenderManagement() {
     setEditTenderItems(newItems);
   };
 
+  const handleRemoveItemFromTender = (index: number) => {
+    if (!window.confirm('Bu ürünü ihaleden çıkarmak istediğinize emin misiniz?')) return;
+    const newItems = [...editTenderItems];
+    newItems.splice(index, 1);
+    setEditTenderItems(newItems);
+  };
+
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [newItemId, setNewItemId] = useState<number | ''>('');
+  const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
+
+  const handleAddItemToTender = () => {
+    if (!newItemId || !newItemLimit) return;
+    const masterItem = items.find(i => i.id === Number(newItemId));
+    if (!masterItem) return;
+
+    const newItem: Item = {
+      unit: editingTender!.unit,
+      name: masterItem.name,
+      measurementUnit: masterItem.measurementUnit,
+      currentStock: 0,
+      createdAt: Date.now(),
+      tenderName: editTenderName,
+      tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
+      tenderLimit: Number(newItemLimit)
+    };
+
+    setEditTenderItems([...editTenderItems, newItem]);
+    setShowAddItemModal(false);
+    setNewItemId('');
+    setNewItemLimit('');
+  };
+
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editPersonnelId || !editConfirm) {
@@ -110,34 +145,72 @@ export default function TenderManagement() {
       const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
       if (!selectedPersonnel) return;
 
+      // Update existing and add new items
+      const originalItemIds = editingTender.items.map(i => i.id).filter(Boolean);
+      const currentItemIds = editTenderItems.map(i => i.id).filter(Boolean);
+
+      // Deletions
+      const toDelete = originalItemIds.filter(id => !currentItemIds.includes(id));
+      for (const id of toDelete) {
+        if (id) await deleteItem(id);
+      }
+
       for (const item of editTenderItems) {
         const originalItem = items.find(i => i.id === item.id);
-        if (!originalItem) continue;
-
-        const changes = [];
-        if (originalItem.tenderName !== editTenderName) changes.push(`İhale Adı: ${originalItem.tenderName} -> ${editTenderName}`);
-        if (originalItem.tenderLimit !== Number(item.tenderLimit)) changes.push(`Limit: ${originalItem.tenderLimit} -> ${item.tenderLimit}`);
         
-        const oldDate = originalItem.tenderEndDate ? format(originalItem.tenderEndDate, 'yyyy-MM-dd') : '';
-        if (oldDate !== editTenderEndDate) changes.push(`Tarih: ${oldDate} -> ${editTenderEndDate}`);
+        if (originalItem) {
+          // Update
+          const changes = [];
+          if (originalItem.tenderName !== editTenderName) changes.push(`İhale Adı: ${originalItem.tenderName} -> ${editTenderName}`);
+          if (originalItem.tenderLimit !== Number(item.tenderLimit)) changes.push(`Limit: ${originalItem.tenderLimit} -> ${item.tenderLimit}`);
+          
+          const oldDate = originalItem.tenderEndDate ? format(originalItem.tenderEndDate, 'yyyy-MM-dd') : '';
+          if (oldDate !== editTenderEndDate) changes.push(`Tarih: ${oldDate} -> ${editTenderEndDate}`);
 
-        const newHistory = [...(originalItem.tenderHistory || [])];
-        if (changes.length > 0) {
-          newHistory.push({
+          const newHistory = [...(originalItem.tenderHistory || [])];
+          if (changes.length > 0) {
+            newHistory.push({
+              date: Date.now(),
+              personnelId: Number(editPersonnelId),
+              personnelName: selectedPersonnel.name,
+              changes: changes.join(', ')
+            });
+          }
+
+          await updateItem({
+            ...item,
+            tenderName: editTenderName,
+            tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
+            tenderLimit: Number(item.tenderLimit),
+            tenderHistory: newHistory
+          });
+        } else {
+          // New addition to existing tender
+          const newItemId = await addItem({
+            ...item,
+            tenderName: editTenderName,
+            tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
+            tenderLimit: Number(item.tenderLimit),
+            tenderHistory: [{
+              date: Date.now(),
+              personnelId: Number(editPersonnelId),
+              personnelName: selectedPersonnel.name,
+              changes: 'İhaleye sonradan eklendi'
+            }]
+          });
+
+          // Initial stock entry for new item
+          await addTransaction({
+            itemId: newItemId as number,
+            unit: item.unit,
+            type: 'GİRİŞ',
+            quantity: Number(item.tenderLimit),
             date: Date.now(),
             personnelId: Number(editPersonnelId),
-            personnelName: selectedPersonnel.name,
-            changes: changes.join(', ')
+            description: 'İhaleye Sonradan Eklenen Ürün Stoğu',
+            documentNo: 'YENİ-EKLEME'
           });
         }
-
-        await updateItem({
-          ...item,
-          tenderName: editTenderName,
-          tenderEndDate: editTenderEndDate ? new Date(editTenderEndDate).getTime() : undefined,
-          tenderLimit: Number(item.tenderLimit),
-          tenderHistory: newHistory
-        });
       }
 
       setShowEditModal(false);
@@ -312,6 +385,18 @@ export default function TenderManagement() {
                 </div>
               </div>
 
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-sm font-medium text-gray-700">İhale Ürünleri</h4>
+                {!isExpired(editingTender.endDate) && (
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddItemModal(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center font-medium"
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Malzeme Ekle
+                  </button>
+                )}
+              </div>
               <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md p-2 bg-gray-50">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100 sticky top-0">
@@ -320,23 +405,36 @@ export default function TenderManagement() {
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Birim</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Toplam Limit</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mevcut Stok</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">İşlem</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {editTenderItems.map((item, index) => (
-                      <tr key={item.id}>
+                      <tr key={item.id || index}>
                         <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
                         <td className="px-4 py-2 text-sm text-gray-500">{item.measurementUnit}</td>
                         <td className="px-4 py-2">
                           <input 
                             type="number" 
                             required 
+                            disabled={isExpired(editingTender.endDate)}
                             value={item.tenderLimit} 
                             onChange={e => handleItemChange(index, 'tenderLimit', e.target.value)}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-xs p-1 border"
                           />
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">{item.currentStock}</td>
+                        <td className="px-4 py-2 text-right">
+                          {!isExpired(editingTender.endDate) && (
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveItemFromTender(index)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -370,6 +468,43 @@ export default function TenderManagement() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Item to Tender Modal */}
+      {showAddItemModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-[60] px-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">İhaleye Yeni Malzeme Ekle</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Malzeme Seçin</label>
+                <select 
+                  value={newItemId} 
+                  onChange={e => setNewItemId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                >
+                  <option value="">Seçiniz...</option>
+                  {items.filter(i => !editTenderItems.some(eti => eti.name === i.name)).map(i => (
+                    <option key={i.id} value={i.id}>{i.name} ({i.measurementUnit})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">İhale Toplam Stoğu (Limit)</label>
+                <input 
+                  type="number" 
+                  value={newItemLimit} 
+                  onChange={e => setNewItemLimit(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button onClick={() => setShowAddItemModal(false)} className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
+                <button onClick={handleAddItemToTender} className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Ekle</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

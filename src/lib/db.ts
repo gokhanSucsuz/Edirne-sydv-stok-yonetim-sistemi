@@ -28,6 +28,7 @@ export interface Item {
   tenderName?: string;
   tenderEndDate?: number;
   tenderLimit?: number;
+  tenderType?: 'İhale' | 'Bağış';
   tenderHistory?: TenderHistory[];
   previousTenderStock?: number;
 }
