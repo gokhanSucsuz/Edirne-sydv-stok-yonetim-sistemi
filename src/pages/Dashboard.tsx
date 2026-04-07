@@ -178,7 +178,7 @@ export default function Dashboard() {
         <div className="bg-white p-6 shadow rounded-lg">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Birimlere Göre Malzeme Dağılımı</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
@@ -197,7 +197,7 @@ export default function Dashboard() {
         <div className="bg-white p-6 shadow rounded-lg">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Stok Oranı</h3>
           <div className="h-64 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={chartData}

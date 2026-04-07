@@ -401,7 +401,7 @@ export default function Statistics() {
         <div className="bg-white shadow sm:rounded-lg p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Birimlere Göre Malzeme Dağılımı</h3>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={pieData}
@@ -427,7 +427,7 @@ export default function Statistics() {
         <div className="bg-white shadow sm:rounded-lg p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Birimlere Göre İşlem Sayıları (Giriş/Çıkış)</h3>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={barData}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}

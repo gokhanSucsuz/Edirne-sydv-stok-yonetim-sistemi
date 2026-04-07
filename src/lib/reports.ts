@@ -1,14 +1,7 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { Item, Transaction, Personnel } from './db';
-
-// Extend jsPDF with autotable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-  }
-}
 
 export const generateItemReport = (
   item: Item,
@@ -65,12 +58,12 @@ export const generateItemReport = (
     ];
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: 60,
     head: [['Tarih', 'İhale/Kaynak', 'İşlem', 'Miktar', 'Kalan Stok', 'Personel', 'Evrak No']],
     body: tableData,
     theme: 'striped',
-    headStyles: { fillStyle: [239, 68, 68] }, // Red-600
+    headStyles: { fillColor: [239, 68, 68] }, // Red-600
   });
 
   doc.save(`${item.name}_rapor_${format(now, 'yyyyMMdd')}.pdf`);
