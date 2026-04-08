@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Users, Package, FileText, AlertCircle } from 'lucide-react';
+import { BookOpen, Users, Package, FileText, AlertCircle, LayoutDashboard, ClipboardCheck, History, Printer } from 'lucide-react';
 
 export default function Guide() {
   return (
@@ -17,93 +17,114 @@ export default function Guide() {
       <div className="bg-white shadow-xl overflow-hidden sm:rounded-2xl border border-gray-100">
         <div className="px-6 py-8 space-y-12">
           
-          {/* Section 1 */}
+          {/* Section 1: Dashboard */}
+          <section className="relative pl-8 border-l-2 border-red-100">
+            <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center mb-4">
+              <LayoutDashboard className="w-6 h-6 mr-3 text-red-600" />
+              1. Gösterge Paneli ve Genel Bakış
+            </h2>
+            <div className="text-gray-600 space-y-4 text-sm">
+              <p className="leading-relaxed">Sisteme giriş yapıldığında karşılaşılan ana ekrandır. Burada vakfın genel stok durumu özetlenir.</p>
+              <ul className="list-disc pl-5 space-y-2 text-gray-700">
+                <li><strong>İstatistikler:</strong> Toplam ürün sayısı, kritik stoktaki ürünler ve aktif ihale sayıları anlık olarak izlenebilir.</li>
+                <li><strong>Aylık Envanter Raporu:</strong> Panelin sağ üst köşesinde bulunan buton ile seçilen ay ve yıl için tüm birimlerdeki stok hareketlerini (giriş/çıkış) içeren detaylı bir rapor alınabilir.</li>
+                <li><strong>Kritik Stok Uyarıları:</strong> Belirlenen limitlerin altına düşen ürünler burada listelenerek hızlı aksiyon alınması sağlanır.</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Section 2: Personnel */}
           <section className="relative pl-8 border-l-2 border-red-100">
             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center mb-4">
               <Users className="w-6 h-6 mr-3 text-red-600" />
-              1. Personel ve Yetkilendirme
+              2. Personel Yönetimi
             </h2>
             <div className="text-gray-600 space-y-4 text-sm">
-              <p className="leading-relaxed">Sistemin temel taşı personel kaydıdır. <strong>Personel Yönetimi</strong> sayfası üzerinden tüm çalışanların sisteme tanımlanması gerekir.</p>
+              <p className="leading-relaxed">Sistemdeki tüm işlemlerin izlenebilirliği için personel kaydı zorunludur.</p>
               <ul className="list-disc pl-5 space-y-2 text-gray-700">
-                <li><strong>Zorunlu Alanlar:</strong> Ad Soyad ve Ünvan bilgileri her personel için girilmelidir.</li>
-                <li><strong>İşlem Onayı:</strong> Yapılan her stok girişi, çıkışı veya ihale düzenlemesi mutlaka bir personel ile ilişkilendirilmelidir.</li>
-                <li><strong>Güvenlik:</strong> Personel seçimi yapılmadan sistem hiçbir veri kaydına izin vermez.</li>
+                <li><strong>Kayıt:</strong> "Personel Yönetimi" sayfasından personel adı, soyadı ve ünvanı ile kayıt yapılır.</li>
+                <li><strong>İşlem İlişkilendirme:</strong> Stok girişi, çıkışı veya ihale tanımlama sırasında mutlaka bir personel seçilmelidir. Bu sayede "Hazırlayan" ve "Onaylayan" kısımları raporlarda otomatik dolar.</li>
               </ul>
             </div>
           </section>
 
-          {/* Section 2 */}
+          {/* Section 3: Tender Management */}
+          <section className="relative pl-8 border-l-2 border-red-100">
+            <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center mb-4">
+              <ClipboardCheck className="w-6 h-6 mr-3 text-red-600" />
+              3. İhale ve Bağış Yönetimi
+            </h2>
+            <div className="text-gray-600 space-y-4 text-sm">
+              <p className="leading-relaxed">İhale bazlı çalışan birimlerde (Vefa Temizlik, Aşevi, Dergah) stok hareketleri ihaleler üzerinden yürür.</p>
+              <ul className="list-disc pl-5 space-y-2 text-gray-700">
+                <li><strong>İhale Tanımlama:</strong> İhale adı, bitiş tarihi ve ihaleye dahil ürünlerin limitleri belirlenir.</li>
+                <li><strong>İhale Raporu:</strong> "İhale Yönetimi" sayfasındaki her ihale için "Rapor Al" butonu bulunur. Bu rapor; ihalenin genel durumunu, ürün bazlı harcanan/kalan stokları ve o ihaleyle ilgili yapılan tüm geçmiş işlemleri gösterir.</li>
+                <li><strong>Limit Kontrolü:</strong> Sistem, ihalede belirlenen limitin üzerinde stok girişi yapılmasına izin vermez.</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Section 4: Stock Operations */}
           <section className="relative pl-8 border-l-2 border-red-100">
             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center mb-4">
               <Package className="w-6 h-6 mr-3 text-red-600" />
-              2. Birimler ve İhale/Bağış Yönetimi
+              4. Stok İşlemleri (Toplu Giriş/Çıkış)
             </h2>
             <div className="text-gray-600 space-y-4 text-sm">
-              <p className="leading-relaxed">Sistemde 5 ana birim bulunmaktadır. Her birimin işleyiş kuralları farklıdır:</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-bold text-gray-900 mb-2">İhale Bazlı Birimler</h4>
-                  <p className="text-xs text-gray-600">Vefa Temizlik, Aşevi, Dergah</p>
-                  <p className="mt-2 text-xs italic text-red-600">Bu birimlerde ihale adı, geçerlilik tarihi ve stok limiti girilmesi zorunludur.</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-bold text-gray-900 mb-2">Serbest Birimler</h4>
-                  <p className="text-xs text-gray-600">Bağış ve Vakıf</p>
-                  <p className="mt-2 text-xs italic text-green-600">İhale şartı aranmaz, doğrudan stok girişi yapılabilir.</p>
-                </div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mt-4">
-                <h4 className="font-bold text-blue-900 mb-2">Dergah Birimi Özel Durumu</h4>
-                <p className="text-xs text-blue-800">Dergah biriminde kayıt yaparken <strong>"İhale"</strong> veya <strong>"Bağış"</strong> seçeneklerinden biri seçilmelidir. Bu seçim raporlarda ve stok takibinde ayrı ayrı gösterilir.</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 3 */}
-          <section className="relative pl-8 border-l-2 border-red-100">
-            <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
-            <h2 className="text-xl font-bold text-gray-900 flex items-center mb-4">
-              <AlertCircle className="w-6 h-6 mr-3 text-red-600" />
-              3. Stok Hareketleri ve FIFO Mantığı
-            </h2>
-            <div className="text-gray-600 space-y-4 text-sm">
-              <p className="leading-relaxed">Stok yönetimi en üst düzey doğruluk için <strong>FIFO (İlk Giren İlk Çıkar)</strong> prensibiyle çalışır:</p>
+              <p className="leading-relaxed">Hata payını azaltmak ve hızı artırmak için sistemde sadece toplu işlemler desteklenmektedir.</p>
               <ul className="list-disc pl-5 space-y-2 text-gray-700">
-                <li><strong>FIFO Sistemi:</strong> Aynı isimde farklı ihalelere ait ürünler varsa, stok çıkışı yapıldığında sistem otomatik olarak en eski tarihli ihaledeki üründen düşüm yapar.</li>
-                <li><strong>Otomatik Evrak No:</strong> Her işlem için sistem benzersiz bir evrak numarası üretir. Kullanıcı manuel giriş yapabilir ancak sistem mükerrer (aynı) numaraya izin vermez.</li>
-                <li><strong>Görsel Uyarılar:</strong> Stok bittiğinde ürünler "Biten Stoklar" bölümüne taşınır. Kritik seviyeye düşen ürünler sarı renkli "Kritik Seviye" uyarısıyla gösterilir.</li>
+                <li><strong>Toplu Stok Girişi:</strong> Vakfa teslim edilen malzemeler için kullanılır. Giriş onaylandığında sistem otomatik olarak <strong>"Muayene ve Kabul Tutanağı"</strong> oluşturur.</li>
+                <li><strong>Toplu Stok Çıkışı:</strong> Malzemelerin harcanması durumunda kullanılır. Sistem <strong>FIFO (İlk Giren İlk Çıkar)</strong> mantığıyla en eski ihaleye ait stoktan düşüm yapar.</li>
+                <li><strong>Mevcut Stok Durumu:</strong> Birim panellerinde ürünler "Kullanılan / Mevcut" formatında gösterilir. "Kullanılan" miktar, ihale kapsamında şimdiye kadar teslim alınan toplam miktardan mevcut stokun çıkarılmasıyla hesaplanır.</li>
               </ul>
             </div>
           </section>
 
-          {/* Section 4 */}
+          {/* Section 5: Reporting */}
           <section className="relative pl-8 border-l-2 border-red-100">
             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center mb-4">
-              <FileText className="w-6 h-6 mr-3 text-red-600" />
-              4. Raporlama ve Çıktılar
+              <Printer className="w-6 h-6 mr-3 text-red-600" />
+              5. Raporlama Sistemi
             </h2>
             <div className="text-gray-600 space-y-4 text-sm">
-              <p className="leading-relaxed">Sistem profesyonel PDF raporları üretme yeteneğine sahiptir:</p>
-              <ul className="list-disc pl-5 space-y-2 text-gray-700">
-                <li><strong>Ürün Bazlı Rapor:</strong> Her ürünün yanındaki "Rapor" butonu ile o ürünün tüm ihalelerdeki hareket geçmişi, personeli ve evrak numaralarıyla birlikte PDF olarak alınabilir.</li>
-                <li><strong>Resmi Stok Raporu:</strong> İstatistikler sayfasından birim bazlı, devreden stokları da içeren resmi formatta raporlar oluşturulabilir.</li>
-                <li><strong>Muayene ve Kabul Tutanağı:</strong> Her stok girişinde sistem otomatik olarak bu tutanağı hazırlar ve yazdırma seçeneği sunar.</li>
-              </ul>
+              <p className="leading-relaxed">Tüm raporlar resmi formatta ve Türkçe karakter sorunu yaşanmayacak şekilde tasarlanmıştır.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-gray-200 p-3 rounded-lg bg-gray-50">
+                  <h4 className="font-bold text-gray-900 text-xs mb-1">Muayene ve Kabul Tutanağı</h4>
+                  <p className="text-[10px] text-gray-600 text-justify">Toplu stok girişi sonrası otomatik üretilir. Malzemelerin şartnameye uygun teslim alındığını belgeler.</p>
+                </div>
+                <div className="border border-gray-200 p-3 rounded-lg bg-gray-50">
+                  <h4 className="font-bold text-gray-900 text-xs mb-1">İhale Detay ve Stok Raporu</h4>
+                  <p className="text-[10px] text-gray-600 text-justify">İhale bazlı tüm hareketleri, diğer ihalelerle karşılaştırmalı stok durumunu ve işlem geçmişini sunar.</p>
+                </div>
+                <div className="border border-gray-200 p-3 rounded-lg bg-gray-50">
+                  <h4 className="font-bold text-gray-900 text-xs mb-1">Aylık Envanter Raporu</h4>
+                  <p className="text-[10px] text-gray-600 text-justify">Belirli bir ay içindeki tüm birimlerin giriş-çıkış hareketlerini kronolojik olarak listeler.</p>
+                </div>
+                <div className="border border-gray-200 p-3 rounded-lg bg-gray-50">
+                  <h4 className="font-bold text-gray-900 text-xs mb-1">Ürün Hareket Raporu</h4>
+                  <p className="text-[10px] text-gray-600 text-justify">Tek bir ürünün tüm ihalelerdeki toplam serüvenini ve mevcut konumunu raporlar.</p>
+                </div>
+              </div>
             </div>
           </section>
 
           <div className="bg-red-50 p-6 rounded-2xl border border-red-100">
             <h3 className="text-red-900 font-bold mb-2 flex items-center">
               <AlertCircle className="w-5 h-5 mr-2" />
-              Önemli Hatırlatma
+              Kritik Uyarılar
             </h3>
-            <p className="text-red-800 text-sm">
-              Süresi dolmuş ihaleler üzerinde kesinlikle değişiklik yapılamaz ve bu ihaleler silinemez. İhale limitleri dolduğunda sistem otomatik olarak çıkış işlemini durdurur. Bu durumda yeni bir ihale tanımlanması gerekmektedir.
-            </p>
+            <ul className="text-red-800 text-xs space-y-2 list-disc pl-5">
+              <li>Stok girişi yapıldığında mutlaka fatura kesilmesi gerektiğini unutmayınız.</li>
+              <li>Süresi dolmuş ihalelerden stok çıkışı yapılabilir ancak yeni stok girişi yapılamaz.</li>
+              <li>Sistemde evrak numaraları benzersiz olmalıdır; aynı numara ile ikinci bir işlem kaydedilemez.</li>
+              <li>Birimler arası malzeme transferi için önce bir birimden çıkış, sonra diğer birime giriş yapılmalıdır.</li>
+            </ul>
           </div>
 
         </div>
