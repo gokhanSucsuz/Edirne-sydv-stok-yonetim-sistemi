@@ -31,6 +31,7 @@ export interface Item {
   tenderType?: 'İhale' | 'Bağış';
   tenderHistory?: TenderHistory[];
   previousTenderStock?: number;
+  totalReceived?: number;
 }
 
 export interface Transaction {
@@ -187,12 +188,13 @@ export async function addTransaction(tx: Omit<Transaction, 'id' | 'remainingStoc
 
   if (tx.type === 'GİRİŞ') {
     if (needsTender && item.tenderLimit) {
-      const currentTenderStock = item.currentStock - (item.previousTenderStock || 0);
-      if (currentTenderStock + tx.quantity > item.tenderLimit) {
-        throw new Error(`İhale limitini aşamazsınız! Maksimum eklenebilecek miktar: ${item.tenderLimit - currentTenderStock}. Yeni ihale yapılması gerekmektedir.`);
+      const totalReceived = item.totalReceived || 0;
+      if (totalReceived + tx.quantity > item.tenderLimit) {
+        throw new Error(`İhale limitini aşamazsınız! Bu ihale kapsamında toplam ${totalReceived} birim alındı. Kalan limit: ${item.tenderLimit - totalReceived}.`);
       }
     }
     item.currentStock += tx.quantity;
+    item.totalReceived = (item.totalReceived || 0) + tx.quantity;
   } else if (tx.type === 'ÇIKIŞ') {
     if (item.currentStock === 0) {
       throw new Error('Stok bitti! İşlem yapılamaz.');

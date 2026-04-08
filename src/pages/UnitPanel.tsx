@@ -77,6 +77,13 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [bulkTenderType, setBulkTenderType] = useState<'İhale' | 'Bağış'>('İhale');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
 
+  // Bulk Entry Modal
+  const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
+  const [bulkEntryItems, setBulkEntryItems] = useState<{ itemId: number | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
+  const [bulkEntryPersonnelId, setBulkEntryPersonnelId] = useState('');
+  const [bulkEntryDocumentNo, setBulkEntryDocumentNo] = useState(generateUniqueDocNo());
+  const [bulkEntryDescription, setBulkEntryDescription] = useState('');
+
   // Bulk Exit Modal
   const [showBulkExitModal, setShowBulkExitModal] = useState(false);
   const [bulkExitItems, setBulkExitItems] = useState<{ itemId: number | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
@@ -367,6 +374,97 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     });
   };
 
+  const handleAddBulkEntryRow = () => {
+    setBulkEntryItems([...bulkEntryItems, { itemId: '', quantity: '' }]);
+  };
+
+  const handleRemoveBulkEntryRow = (index: number) => {
+    const newItems = [...bulkEntryItems];
+    newItems.splice(index, 1);
+    setBulkEntryItems(newItems);
+  };
+
+  const handleBulkEntryItemChange = (index: number, field: string, value: any) => {
+    const newItems = [...bulkEntryItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setBulkEntryItems(newItems);
+  };
+
+  const handleSubmitBulkEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkEntryPersonnelId || !bulkEntryDocumentNo) {
+      alert('Personel ve evrak no zorunludur.');
+      return;
+    }
+
+    const docExists = await checkDocumentNoExists(bulkEntryDocumentNo);
+    if (docExists) {
+      alert('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
+      return;
+    }
+
+    for (const item of bulkEntryItems) {
+      if (!item.itemId || !item.quantity) {
+        alert('Tüm satırlar için malzeme ve miktar girilmelidir.');
+        return;
+      }
+      
+      const selectedItem = items.find(i => i.id === Number(item.itemId));
+      if (selectedItem && needsTender && selectedItem.tenderLimit) {
+        const totalReceived = selectedItem.totalReceived || 0;
+        if (totalReceived + Number(item.quantity) > selectedItem.tenderLimit) {
+          alert(`${selectedItem.name} (${selectedItem.tenderName}) için ihale limitini aşamazsınız! Toplam alınan: ${totalReceived}, Kalan limit: ${selectedItem.tenderLimit - totalReceived}`);
+          return;
+        }
+      }
+    }
+
+    try {
+      const addedItemsForPrint = [];
+      for (const item of bulkEntryItems) {
+        const selectedItem = items.find(i => i.id === Number(item.itemId));
+        if (!selectedItem) continue;
+
+        await addTransaction({
+          itemId: selectedItem.id!,
+          unit: unit,
+          type: 'GİRİŞ',
+          quantity: Number(item.quantity),
+          date: Date.now(),
+          personnelId: Number(bulkEntryPersonnelId),
+          description: bulkEntryDescription || 'Toplu Stok Girişi',
+          documentNo: bulkEntryDocumentNo
+        });
+
+        addedItemsForPrint.push({
+          itemName: selectedItem.name,
+          tenderName: selectedItem.tenderName,
+          quantity: item.quantity,
+          measurementUnit: selectedItem.measurementUnit
+        });
+      }
+
+      printBulkMuayeneKabul({
+        items: addedItemsForPrint,
+        tenderName: 'Toplu Stok Girişi',
+        documentNo: bulkEntryDocumentNo,
+        personnelName: personnelMap[Number(bulkEntryPersonnelId)],
+        date: Date.now()
+      });
+
+      setShowBulkEntryModal(false);
+      setBulkEntryItems([{ itemId: '', quantity: '' }]);
+      setBulkEntryPersonnelId('');
+      setBulkEntryDocumentNo(generateUniqueDocNo());
+      setBulkEntryDescription('');
+      loadData();
+      alert('Toplu stok girişi başarıyla tamamlandı.');
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Bir hata oluştu.');
+    }
+  };
+
   const handleAddBulkExitRow = () => {
     setBulkExitItems([...bulkExitItems, { itemId: '', quantity: '' }]);
   };
@@ -564,9 +662,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
 
     try {
-      const addedItemsForPrint = [];
       for (const item of bulkItems) {
-        const newItemId = await addItem({
+        await addItem({
           name: item.name,
           unit: unit,
           measurementUnit: item.unit,
@@ -576,32 +673,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           tenderLimit: Number(item.limit),
           tenderType: bulkTenderType
         });
-
-        await addTransaction({
-          itemId: newItemId as number,
-          unit: unit,
-          type: 'GİRİŞ',
-          quantity: Number(item.limit),
-          date: Date.now(),
-          personnelId: Number(bulkPersonnelId),
-          description: `${bulkTenderType} Başlangıç Stoğu`,
-          documentNo: bulkDocumentNo
-        });
-
-        addedItemsForPrint.push({
-          itemName: item.name,
-          quantity: item.limit,
-          measurementUnit: item.unit
-        });
       }
-
-      printBulkMuayeneKabul({
-        items: addedItemsForPrint,
-        tenderName: bulkTenderName, // Added tenderName
-        documentNo: bulkDocumentNo,
-        personnelName: personnelMap[Number(bulkPersonnelId)],
-        date: Date.now()
-      });
 
       setShowTenderModal(false);
       setBulkTenderName('');
@@ -610,6 +682,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       setBulkPersonnelId('');
       setBulkDocumentNo(generateUniqueDocNo());
       loadData();
+      alert('İhale başarıyla tanımlandı. Stok girişi yapmak için "Toplu Stok Girişi" panelini kullanabilirsiniz.');
     } catch (err) {
       console.error(err);
       alert('İhale kaydedilirken bir hata oluştu.');
@@ -926,22 +999,31 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           <div className="bg-white shadow sm:rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Stok Giriş / Çıkış Paneli</h3>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <button
                 type="button"
                 onClick={() => setShowTenderModal(true)}
-                className="flex justify-center items-center px-4 py-4 border-2 border-dashed border-red-300 rounded-xl text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 transition-all shadow-sm"
+                className="flex flex-col justify-center items-center p-4 border-2 border-dashed border-red-300 rounded-xl text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 transition-all shadow-sm"
               >
-                <Plus className="w-6 h-6 mr-2" />
-                {needsTender ? 'Yeni İhale Tanımla' : 'Toplu Stok Girişi'}
+                <Plus className="w-6 h-6 mb-1" />
+                İhale / Bağış Tanımla
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowBulkEntryModal(true)}
+                className="flex flex-col justify-center items-center p-4 border-2 border-dashed border-green-300 rounded-xl text-sm font-semibold text-green-700 bg-green-50 hover:bg-green-100 transition-all shadow-sm"
+              >
+                <ArrowDownRight className="w-6 h-6 mb-1" />
+                Toplu Stok Girişi
               </button>
               
               <button
                 type="button"
                 onClick={() => setShowBulkExitModal(true)}
-                className="flex justify-center items-center px-4 py-4 border-2 border-dashed border-gray-300 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all shadow-sm"
+                className="flex flex-col justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all shadow-sm"
               >
-                <ArrowUpRight className="w-6 h-6 mr-2" />
+                <ArrowUpRight className="w-6 h-6 mb-1" />
                 Toplu Stok Çıkışı
               </button>
             </div>
@@ -1631,6 +1713,79 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           </div>
         </div>
       )}
+      {/* Bulk Entry Modal */}
+      {showBulkEntryModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-xl max-h-[90vh] flex flex-col">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Toplu Stok Girişi</h3>
+            <form onSubmit={handleSubmitBulkEntry} className="flex flex-col flex-1 overflow-hidden">
+              <div className="grid grid-cols-2 gap-4 mb-6 bg-gray-50 p-3 rounded-md border border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">İşlemi Yapan Personel</label>
+                  <select required value={bulkEntryPersonnelId} onChange={e => setBulkEntryPersonnelId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border">
+                    <option value="">Seçiniz...</option>
+                    {personnel.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Resmi Evrak No</label>
+                  <input type="text" required value={bulkEntryDocumentNo} onChange={e => setBulkEntryDocumentNo(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Açıklama</label>
+                <input type="text" value={bulkEntryDescription} onChange={e => setBulkEntryDescription(e.target.value)} placeholder="Toplu giriş açıklaması..." className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+              </div>
+
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-md font-medium text-gray-800">Giriş Yapılacak Ürünler</h4>
+                <button type="button" onClick={handleAddBulkEntryRow} className="text-sm text-red-600 hover:text-red-800 flex items-center font-medium">
+                  <Plus className="w-4 h-4 mr-1" /> Yeni Satır Ekle
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md p-2 bg-gray-50">
+                {bulkEntryItems.map((item, index) => (
+                  <div key={index} className="flex items-center space-x-3 mb-3 bg-white p-3 rounded shadow-sm border border-gray-100">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Malzeme / İhale</label>
+                      <select
+                        required
+                        value={item.itemId}
+                        onChange={(e) => handleBulkEntryItemChange(index, 'itemId', e.target.value)}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                      >
+                        <option value="">Seçiniz...</option>
+                        {items.map(i => (
+                          <option key={i.id} value={i.id}>{i.name} {i.tenderName ? `(${i.tenderName})` : ''} - Mevcut: {i.currentStock} {i.measurementUnit}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Miktar</label>
+                      <input type="number" required min="0.01" step="0.01" value={item.quantity} onChange={e => handleBulkEntryItemChange(index, 'quantity', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border" />
+                    </div>
+                    <div className="pt-5">
+                      <button type="button" onClick={() => handleRemoveBulkEntryRow(index)} disabled={bulkEntryItems.length === 1} className="text-gray-400 hover:text-red-600 disabled:opacity-50">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                <button type="button" onClick={() => setShowBulkEntryModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
+                <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Girişleri Kaydet ve Rapor Al</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Exit Modal */}
       {showBulkExitModal && (
         <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
