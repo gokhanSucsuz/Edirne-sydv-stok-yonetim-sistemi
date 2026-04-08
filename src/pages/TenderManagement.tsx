@@ -8,12 +8,15 @@ import {
   deleteItem,
   addItem,
   addTransaction,
+  getAllTransactions,
   UnitType,
   generateUniqueDocNo,
-  checkDocumentNoExists
+  checkDocumentNoExists,
+  Transaction
 } from '../lib/db';
 import { format } from 'date-fns';
-import { PackageOpen, Edit2, X, AlertCircle, Search, Building2, Calendar, Package, Plus } from 'lucide-react';
+import { PackageOpen, Edit2, X, AlertCircle, Search, Building2, Calendar, Package, Plus, FileText } from 'lucide-react';
+import { generateTenderReport } from '../lib/reports';
 
 interface TenderGroup {
   tenderName: string;
@@ -25,6 +28,7 @@ interface TenderGroup {
 export default function TenderManagement() {
   const [items, setItems] = useState<Item[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [tenders, setTenders] = useState<TenderGroup[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -42,13 +46,15 @@ export default function TenderManagement() {
 
   const loadData = async () => {
     setLoading(true);
-    const [loadedItems, loadedPersonnel] = await Promise.all([
+    const [loadedItems, loadedPersonnel, loadedTransactions] = await Promise.all([
       getAllItems(),
-      getPersonnel()
+      getPersonnel(),
+      getAllTransactions()
     ]);
     
     setItems(loadedItems);
     setPersonnel(loadedPersonnel);
+    setTransactions(loadedTransactions);
 
     // Group items by tenderName and unit
     const grouped: Record<string, TenderGroup> = {};
@@ -313,7 +319,16 @@ export default function TenderManagement() {
                     {isExpired(tender.endDate) && <span className="ml-2 text-[10px] uppercase tracking-wider bg-red-100 px-1 rounded">Süresi Doldu</span>}
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      generateTenderReport(tender.tenderName, tender.unit, tender.items, items, transactions, personnel);
+                    }}
+                    className="text-blue-600 text-sm font-medium flex items-center hover:underline"
+                  >
+                    <FileText className="w-4 h-4 mr-1" /> Rapor Al
+                  </button>
                   <span className={`${isExpired(tender.endDate) ? 'text-gray-400' : 'text-red-600'} text-sm font-medium flex items-center group-hover:underline`}>
                     {isExpired(tender.endDate) ? <Search className="w-4 h-4 mr-1" /> : <Edit2 className="w-4 h-4 mr-1" />} 
                     {isExpired(tender.endDate) ? 'Görüntüle' : 'Düzenle'}
