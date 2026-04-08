@@ -1538,6 +1538,15 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 ))}
               </div>
 
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div className="flex items-center">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+                  <p className="text-sm text-yellow-800 font-medium">
+                    UYARI: Bu işlem onaylandığında sisteme stok girişi yapılacak ve fatura kesilecektir. Devam etmek istediğinizden emin misiniz?
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
                 <button type="button" onClick={() => setShowBulkEntryModal(false)} className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">İptal</button>
                 <button type="submit" className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Girişleri Kaydet ve Rapor Al</button>

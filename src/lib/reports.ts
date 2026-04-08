@@ -147,3 +147,135 @@ export const generateItemReport = (
   printWindow.document.write(html);
   printWindow.document.close();
 };
+
+export const generateMonthlyInventoryReport = (
+  items: Item[],
+  transactions: Transaction[],
+  personnel: Personnel[],
+  month: number,
+  year: number
+) => {
+  const now = new Date();
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+
+  const monthNames = [
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+  ];
+
+  const startDate = new Date(year, month, 1);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+  const filteredTransactions = transactions.filter(tx => 
+    tx.date >= startDate.getTime() && tx.date <= endDate.getTime()
+  ).sort((a, b) => a.date - b.date);
+
+  const itemMap = new Map(items.map(i => [i.id, i]));
+  const personnelMap = new Map(personnel.map(p => [p.id, p.name]));
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+      <meta charset="UTF-8">
+      <title>Aylık Envanter Raporu - ${monthNames[month]} ${year}</title>
+      <style>
+        body { font-family: 'Times New Roman', Times, serif; margin: 30px; color: #000; line-height: 1.4; }
+        .header { text-align: center; margin-bottom: 20px; position: relative; }
+        .logo { position: absolute; left: 0; top: 0; width: 50px; height: 50px; border-radius: 50%; }
+        .header h1 { font-size: 14px; margin: 2px 0; font-weight: bold; }
+        .header h2 { font-size: 12px; margin: 2px 0; font-weight: normal; }
+        .date-right { text-align: right; margin-bottom: 15px; font-size: 10px; }
+        .title { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
+        th, td { border: 1px solid #000; padding: 5px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+        .signature { text-align: center; width: 180px; font-size: 11px; }
+        .signature p { margin: 3px 0; }
+        @media print {
+          body { margin: 15px; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="${APP_LOGO_URL}" class="logo" />
+        <h1>T.C.</h1>
+        <h1>EDİRNE VALİLİĞİ</h1>
+        <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
+      </div>
+      
+      <div class="date-right">
+        Rapor Tarihi: ${format(now, 'dd.MM.yyyy HH:mm')}
+      </div>
+
+      <div class="title">${monthNames[month].toUpperCase()} ${year} DÖNEMİ TÜM BİRİMLER STOK HAREKET RAPORU</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Sıra</th>
+            <th>Tarih</th>
+            <th>Birim</th>
+            <th>Malzeme Adı</th>
+            <th>İşlem</th>
+            <th>Miktar</th>
+            <th>Birim</th>
+            <th>Personel</th>
+            <th>Evrak No</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredTransactions.length === 0 ? '<tr><td colspan="9" style="text-align:center;">Bu dönemde herhangi bir hareket bulunmamaktadır.</td></tr>' : 
+            filteredTransactions.map((tx, index) => {
+              const item = itemMap.get(tx.itemId);
+              return `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${format(tx.date, 'dd.MM.yyyy')}</td>
+                  <td>${tx.unit}</td>
+                  <td>${item?.name || 'Bilinmeyen'}</td>
+                  <td style="color: ${tx.type === 'GİRİŞ' ? 'green' : 'red'}; font-weight: bold;">${tx.type}</td>
+                  <td>${tx.quantity}</td>
+                  <td>${item?.measurementUnit || '-'}</td>
+                  <td>${personnelMap.get(tx.personnelId) || '-'}</td>
+                  <td>${tx.documentNo}</td>
+                </tr>
+              `;
+            }).join('')
+          }
+        </tbody>
+      </table>
+
+      <div class="footer">
+        <div class="signature">
+          <p>Hazırlayan</p>
+          <br/><br/>
+          <p>................................</p>
+          <p>Vakıf Personeli</p>
+        </div>
+        <div class="signature">
+          <p>Onaylayan</p>
+          <br/><br/>
+          <p>................................</p>
+          <p>Vakıf Müdürü</p>
+        </div>
+      </div>
+
+      <script>
+        window.onload = function() { 
+          setTimeout(() => {
+            window.print(); 
+          }, 500);
+        }
+      </script>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+};

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { getPersonnel, getAllItems, getAllTransactions, getMasterItems, Personnel, Item, Transaction, UnitType } from '../lib/db';
 import { Link } from 'react-router-dom';
-import { Package, ArrowDownRight, ArrowUpRight, Users, PackageOpen, AlertTriangle, AlertCircle, Droplets, Utensils, Home, Gift, Building2 } from 'lucide-react';
+import { Package, ArrowDownRight, ArrowUpRight, Users, PackageOpen, AlertTriangle, AlertCircle, Droplets, Utensils, Home, Gift, Building2, FileText, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { generateMonthlyInventoryReport } from '../lib/reports';
 
 const UNITS: UnitType[] = ['Vefa Temizlik', 'Aşevi', 'Dergah', 'Bağış', 'Vakıf'];
 const UNIT_ICONS = {
@@ -30,10 +31,17 @@ export default function Dashboard() {
   const [personnelMap, setPersonnelMap] = useState<Record<number, string>>({});
   const [unitStats, setUnitStats] = useState<UnitStats[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [allItems, setAllItems] = useState<Item[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([]);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth());
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     const loadData = async () => {
       const p = await getPersonnel();
+      setAllPersonnel(p);
       setPersonnelCount(p.length);
       
       const pMap: Record<number, string> = {};
@@ -43,6 +51,7 @@ export default function Dashboard() {
       setPersonnelMap(pMap);
 
       const items = await getAllItems();
+      setAllItems(items);
       const mItems = await getMasterItems();
       setMasterItemsCount(mItems.length);
 
@@ -51,6 +60,7 @@ export default function Dashboard() {
       setTendersCount(uniqueTenders.size);
 
       const txs = await getAllTransactions();
+      setAllTransactions(txs);
       setRecentTransactions(txs.sort((a, b) => b.date - a.date).slice(0, 5));
 
       // Calculate per-unit stats
@@ -99,7 +109,16 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-gray-900">Gösterge Paneli</h1>
-        <div className="text-sm text-gray-500">Son Güncelleme: {new Date().toLocaleTimeString('tr-TR')}</div>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Aylık Envanter Raporu Al
+          </button>
+          <div className="text-sm text-gray-500">Son Güncelleme: {new Date().toLocaleTimeString('tr-TR')}</div>
+        </div>
       </div>
 
       {/* Global Alerts */}
@@ -339,6 +358,66 @@ export default function Dashboard() {
           )}
         </ul>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center mb-4 text-red-600">
+              <Calendar className="w-6 h-6 mr-2" />
+              <h3 className="text-lg font-medium text-gray-900">Aylık Envanter Raporu</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">
+              Tüm birimlerin seçilen aydaki stok giriş ve çıkış hareketlerini içeren detaylı raporu hazırlar.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Yıl</label>
+                <select
+                  value={reportYear}
+                  onChange={(e) => setReportYear(Number(e.target.value))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                >
+                  {[2023, 2024, 2025, 2026].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Ay</label>
+                <select
+                  value={reportMonth}
+                  onChange={(e) => setReportMonth(Number(e.target.value))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
+                >
+                  {["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"].map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-8">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => {
+                  generateMonthlyInventoryReport(allItems, allTransactions, allPersonnel, reportMonth, reportYear);
+                  setShowReportModal(false);
+                }}
+                className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+              >
+                Raporu Oluştur
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
