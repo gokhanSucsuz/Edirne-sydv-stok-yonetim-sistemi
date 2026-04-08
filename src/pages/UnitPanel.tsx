@@ -44,13 +44,6 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   
   const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(unit);
   
-  // New Transaction Form
-  const [txItemId, setTxItemId] = useState<number | ''>('');
-  const [txType, setTxType] = useState<'GİRİŞ' | 'ÇIKIŞ'>('GİRİŞ');
-  const [txQuantity, setTxQuantity] = useState<number | ''>('');
-  const [txPersonnelId, setTxPersonnelId] = useState<number | ''>('');
-  const [txDescription, setTxDescription] = useState('');
-  const [txDocumentNo, setTxDocumentNo] = useState(generateUniqueDocNo());
   const [error, setError] = useState('');
 
   // Edit Item Form
@@ -154,16 +147,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   useEffect(() => {
     loadData();
-    // Reset forms when unit changes
-    setTxItemId('');
-    setTxPersonnelId('');
     setError('');
-    if (needsTender) {
-      setTxType('ÇIKIŞ');
-    } else {
-      setTxType('GİRİŞ');
-    }
-  }, [unit, needsTender]);
+  }, [unit]);
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -843,95 +828,6 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     printWindow.document.close();
   };
 
-  const handleAddTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!txItemId || !txQuantity || !txPersonnelId || !txDocumentNo) {
-      setError('Lütfen zorunlu alanları doldurun.');
-      return;
-    }
-
-    const docExists = await checkDocumentNoExists(txDocumentNo);
-    if (docExists) {
-      setError('Bu evrak numarası zaten sistemde kayıtlı. Lütfen farklı bir numara girin.');
-      return;
-    }
-
-    const selectedItem = itemMap[Number(txItemId)];
-    if (needsTender && (!selectedItem.tenderName || !selectedItem.tenderLimit)) {
-      setError('Bu malzeme için ihale bilgisi girilmeden işlem yapılamaz. Lütfen önce malzemeyi düzenleyerek ihale bilgilerini girin.');
-      return;
-    }
-
-    const totalStockForProduct = groupedItems[selectedItem.name]?.totalStock || 0;
-
-    try {
-      if (txType === 'ÇIKIŞ') {
-        const quantityToExit = Number(txQuantity);
-        
-        if (totalStockForProduct < quantityToExit) {
-          setError(`Yetersiz toplam stok! Mevcut: ${totalStockForProduct} ${selectedItem.measurementUnit}`);
-          return;
-        }
-
-        // FIFO Logic: Find all items with same name in this unit, sort by createdAt
-        const sameItems = items
-          .filter(i => i.name === selectedItem.name && i.currentStock > 0)
-          .sort((a, b) => a.createdAt - b.createdAt);
-
-        let remainingToExit = quantityToExit;
-        for (const stockItem of sameItems) {
-          if (remainingToExit <= 0) break;
-          const takeFromThis = Math.min(stockItem.currentStock, remainingToExit);
-          
-          await addTransaction({
-            itemId: stockItem.id!,
-            unit: unit,
-            type: 'ÇIKIŞ',
-            quantity: takeFromThis,
-            date: Date.now(),
-            personnelId: Number(txPersonnelId),
-            description: txDescription || 'Stok Çıkışı (FIFO)',
-            documentNo: txDocumentNo
-          });
-
-          remainingToExit -= takeFromThis;
-        }
-
-        if (remainingToExit > 0) {
-          throw new Error(`Yetersiz toplam stok! Kalan: ${remainingToExit}`);
-        }
-      } else {
-        await addTransaction({
-          itemId: Number(txItemId),
-          unit: unit,
-          type: txType,
-          quantity: Number(txQuantity),
-          date: Date.now(),
-          personnelId: Number(txPersonnelId),
-          description: txDescription,
-          documentNo: txDocumentNo
-        });
-
-        printMuayeneKabul({
-          itemName: itemMap[Number(txItemId)]?.name,
-          quantity: txQuantity,
-          measurementUnit: itemMap[Number(txItemId)]?.measurementUnit,
-          documentNo: txDocumentNo,
-          personnelName: personnelMap[Number(txPersonnelId)],
-          date: Date.now()
-        });
-      }
-
-      setTxQuantity('');
-      setTxDescription('');
-      setTxDocumentNo(generateUniqueDocNo());
-      loadData();
-    } catch (err: any) {
-      setError(err.message || 'İşlem sırasında bir hata oluştu.');
-    }
-  };
-
   const personnelMap = personnel.reduce((acc, p) => {
     if (p.id) acc[p.id] = p.name;
     return acc;
@@ -1219,143 +1115,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           </div>
         </div>
 
-        {/* İşlem Ekleme ve Geçmiş */}
+        {/* İşlem Geçmişi */}
         <div className="space-y-6">
-          <div className="bg-white shadow sm:rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Stok İşlemi (Giriş/Çıkış)</h3>
-            {error && (
-              <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-            <form onSubmit={handleAddTransaction} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">İşlem Türü</label>
-                  <select
-                    value={txType}
-                    onChange={(e) => setTxType(e.target.value as 'GİRİŞ' | 'ÇIKIŞ')}
-                    disabled={needsTender}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border disabled:bg-gray-100 disabled:text-gray-500"
-                  >
-                    {!needsTender && <option value="GİRİŞ">GİRİŞ</option>}
-                    <option value="ÇIKIŞ">ÇIKIŞ</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Malzeme</label>
-                  <select
-                    required
-                    value={txItemId}
-                    onChange={(e) => setTxItemId(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                  >
-                    <option value="">Seçiniz...</option>
-                    {(() => {
-                      if (txType === 'ÇIKIŞ') {
-                        // For exits, show unique names
-                        const uniqueNames = Array.from(new Set(items.filter(i => i.currentStock > 0).map(i => i.name)));
-                        return uniqueNames.map(name => {
-                          const firstItem = items.find(i => i.name === name);
-                          const totalStock = items.filter(i => i.name === name).reduce((acc, i) => acc + i.currentStock, 0);
-                          return (
-                            <option key={name} value={firstItem?.id}>
-                              {name} (Toplam: {totalStock} {firstItem?.measurementUnit})
-                            </option>
-                          );
-                        });
-                      } else {
-                        return items.map(item => (
-                          <option key={item.id} value={item.id}>{item.name} {item.tenderName ? `(${item.tenderName})` : ''}</option>
-                        ));
-                      }
-                    })()}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Miktar</label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="number"
-                      required
-                      min="0.01"
-                      step="0.01"
-                      value={txQuantity}
-                      onChange={(e) => setTxQuantity(e.target.value)}
-                      className="flex-1 block w-full rounded-none rounded-l-md border-gray-300 focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                    />
-                    <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                      {txItemId ? itemMap[Number(txItemId)]?.measurementUnit : '-'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">İşlemi Yapan Personel</label>
-                  <select
-                    required
-                    value={txPersonnelId}
-                    onChange={(e) => setTxPersonnelId(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                  >
-                    <option value="">Seçiniz...</option>
-                    {personnel.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} - {p.title}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {txType === 'ÇIKIŞ' && txItemId && txQuantity && (
-                <div className={`p-3 rounded-md border flex justify-between items-center ${
-                  ((groupedItems[itemMap[Number(txItemId)]?.name]?.totalStock || 0) - Number(txQuantity)) < 0 
-                  ? 'bg-red-50 border-red-200 text-red-700' 
-                  : 'bg-green-50 border-green-200 text-green-700'
-                }`}>
-                  <span className="text-sm font-medium">İşlem Sonrası Toplam Kalan Stok:</span>
-                  <span className="text-lg font-bold">
-                    {((groupedItems[itemMap[Number(txItemId)]?.name]?.totalStock || 0) - Number(txQuantity)).toFixed(2)} {itemMap[Number(txItemId)]?.measurementUnit}
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Resmi Evrak No</label>
-                  <input
-                    type="text"
-                    required
-                    value={txDocumentNo}
-                    onChange={(e) => setTxDocumentNo(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                    placeholder="Örn: 2023/123"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Açıklama (Opsiyonel)</label>
-                  <input
-                    type="text"
-                    value={txDescription}
-                    onChange={(e) => setTxDescription(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={personnel.length === 0}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400"
-                >
-                  İşlemi Kaydet
-                </button>
-              </div>
-            </form>
-          </div>
-
           <div className="bg-white shadow sm:rounded-lg overflow-hidden">
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg font-medium text-gray-900">Son İşlemler</h3>
