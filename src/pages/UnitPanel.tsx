@@ -102,6 +102,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     name: string;
     totalStock: number;
     totalLimit: number;
+    totalReceived: number;
     measurementUnit: string;
     unit: string;
     tenders: Item[];
@@ -114,6 +115,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         name: item.name,
         totalStock: 0,
         totalLimit: 0,
+        totalReceived: 0,
         measurementUnit: item.measurementUnit,
         unit: item.unit,
         tenders: [],
@@ -121,6 +123,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       };
     }
     acc[item.name].totalStock += item.currentStock;
+    acc[item.name].totalReceived += (item.totalReceived || 0);
     // Use the limit of the most recently created tender as the reference for low stock calculation
     if (item.createdAt > (acc[item.name].latestCreatedAt || 0)) {
       acc[item.name].totalLimit = (item.tenderLimit || 0);
@@ -947,7 +950,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Malzeme</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miktar</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanılan / Mevcut</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                   </tr>
                 </thead>
@@ -983,17 +986,26 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className={`font-bold ${isLowStock ? 'text-yellow-600' : 'text-green-600'}`}>
-                              {group.totalStock}
-                            </span> {group.measurementUnit}
+                            <div className="flex flex-col">
+                              <div className="flex items-center">
+                                <span className={`font-bold ${isLowStock ? 'text-yellow-600' : 'text-green-600'}`}>
+                                  {group.totalStock}
+                                </span>
+                                <span className="ml-1 text-xs">{group.measurementUnit} (Mevcut)</span>
+                              </div>
+                              <div className="flex items-center text-xs text-red-500 mt-1">
+                                <span className="font-medium">{(group.totalReceived - group.totalStock).toFixed(2)}</span>
+                                <span className="ml-1">{group.measurementUnit} (Kullanılan)</span>
+                              </div>
+                            </div>
                             {isLowStock && (
-                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800">
                                 Kritik Seviye
                               </span>
                             )}
                             {group.totalLimit > 0 && (
-                              <div className="text-xs text-gray-400 mt-1">
-                                Toplam Limit: {group.totalLimit}
+                              <div className="text-[10px] text-gray-400 mt-1">
+                                İhale Limiti: {group.totalLimit}
                               </div>
                             )}
                           </td>
