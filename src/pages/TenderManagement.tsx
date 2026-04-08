@@ -56,11 +56,11 @@ export default function TenderManagement() {
     setPersonnel(loadedPersonnel);
     setTransactions(loadedTransactions);
 
-    // Group items by tenderName and unit
+    // Group items by tenderId (fallback to tenderName-unit for legacy items)
     const grouped: Record<string, TenderGroup> = {};
     loadedItems.forEach(item => {
       if (item.tenderName) {
-        const key = `${item.tenderName}-${item.unit}`;
+        const key = item.tenderId || `${item.tenderName}-${item.unit}`;
         if (!grouped[key]) {
           grouped[key] = {
             tenderName: item.tenderName,

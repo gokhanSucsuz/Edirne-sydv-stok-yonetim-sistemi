@@ -16,11 +16,11 @@ import {
   checkDocumentNoExists,
   generateUniqueDocNo
 } from '../lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen, FileText, ChevronDown } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen, FileText, ChevronDown, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { APP_LOGO_URL } from '../constants';
 import { Link } from 'react-router-dom';
-import { generateItemReport } from '../lib/reports';
+import { generateItemReport, generateMonthlyInventoryReport, generateTenderReport } from '../lib/reports';
 import { cn } from '../lib/utils';
 
 interface UnitPanelProps {
@@ -69,6 +69,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [bulkDocumentNo, setBulkDocumentNo] = useState(generateUniqueDocNo());
   const [bulkTenderType, setBulkTenderType] = useState<'İhale' | 'Bağış'>('İhale');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
+  const [bulkTenderId, setBulkTenderId] = useState(generateUniqueDocNo('TND'));
 
   // Bulk Entry Modal
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
@@ -124,16 +125,24 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
     acc[item.name].totalStock += item.currentStock;
     acc[item.name].totalReceived += (item.totalReceived || 0);
-    // Use the limit of the most recently created tender as the reference for low stock calculation
+    acc[item.name].totalLimit += (item.tenderLimit || 0);
+    
     if (item.createdAt > (acc[item.name].latestCreatedAt || 0)) {
-      acc[item.name].totalLimit = (item.tenderLimit || 0);
       acc[item.name].latestCreatedAt = item.createdAt;
     }
     acc[item.name].tenders.push(item);
     return acc;
   }, {} as Record<string, GroupedItem & { latestCreatedAt?: number }>);
 
-  const groupedList: GroupedItem[] = Object.values(groupedItems);
+  const groupedList: GroupedItem[] = (Object.values(groupedItems) as any[]).map(g => ({
+    name: g.name,
+    totalStock: g.totalStock,
+    totalLimit: g.totalLimit,
+    totalReceived: g.totalReceived,
+    measurementUnit: g.measurementUnit,
+    unit: g.unit,
+    tenders: g.tenders.sort((a: Item, b: Item) => a.createdAt - b.createdAt) // Sort tenders by date for FIFO display
+  }));
 
   const loadData = async () => {
     const [loadedItems, loadedTxs, loadedPersonnel, loadedMasterItems] = await Promise.all([
@@ -650,16 +659,26 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
 
     try {
+      const selectedPersonnel = personnel.find(p => p.id === Number(bulkPersonnelId));
+      if (!selectedPersonnel) return;
+
       for (const item of bulkItems) {
         await addItem({
           name: item.name,
           unit: unit,
           measurementUnit: item.unit,
           currentStock: 0,
+          tenderId: bulkTenderId,
           tenderName: bulkTenderName,
           tenderEndDate: bulkTenderEndDate ? new Date(bulkTenderEndDate).getTime() : undefined,
           tenderLimit: Number(item.limit),
-          tenderType: bulkTenderType
+          tenderType: bulkTenderType,
+          tenderHistory: [{
+            date: Date.now(),
+            personnelId: Number(bulkPersonnelId),
+            personnelName: selectedPersonnel.name,
+            changes: 'İhale/Bağış Tanımlandı'
+          }]
         });
       }
 
@@ -668,6 +687,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
       setBulkTenderEndDate('');
       setBulkItems([{ name: '', unit: 'Adet', limit: '' }]);
       setBulkPersonnelId('');
+      setBulkTenderId(generateUniqueDocNo('TND'));
       setBulkDocumentNo(generateUniqueDocNo());
       loadData();
       alert('İhale başarıyla tanımlandı. Stok girişi yapmak için "Toplu Stok Girişi" panelini kullanabilirsiniz.');
@@ -951,16 +971,19 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Malzeme</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanılan / Mevcut</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İhale Limit Bilgisi</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {groupedList.filter(g => g.totalStock > 0).length === 0 ? (
-                    <tr><td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">Mevcut stokta malzeme bulunmuyor.</td></tr>
+                    <tr><td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">Mevcut stokta malzeme bulunmuyor.</td></tr>
                   ) : (
                     groupedList.filter(g => g.totalStock > 0).map((group) => {
                       const isLowStock = group.totalStock < (group.totalLimit ? Math.max(group.totalLimit * 0.1, 2) : 2);
                       const mainItem = group.tenders[0]; // Use first item for general info
+                      const usedLimit = group.totalReceived;
+                      const remainingLimit = group.totalLimit - group.totalReceived;
                       
                       return (
                         <tr key={group.name}>
@@ -972,15 +995,18 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                               )}
                             </div>
                             <div className="mt-1 space-y-1">
-                              {group.tenders.filter(t => t.currentStock > 0).map(t => (
+                              {group.tenders.filter(t => t.currentStock > 0).map((t, idx) => (
                                 <div 
                                   key={t.id}
-                                  className="text-[10px] text-blue-600 font-normal cursor-pointer hover:underline flex items-center"
+                                  className={`text-[10px] p-1 rounded border ${idx === 0 ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold' : 'bg-gray-50 border-gray-200 text-gray-600'} cursor-pointer hover:shadow-sm flex items-center justify-between`}
                                   onClick={() => setHistoryItem(t)}
+                                  title={idx === 0 ? "FIFO: İlk kullanılacak stok budur." : "Bu stoktan önce eski ihaleler kullanılmalıdır."}
                                 >
-                                  {t.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {t.tenderName} 
-                                  {t.tenderEndDate && ` (Bitiş: ${format(t.tenderEndDate, 'dd.MM.yyyy')})`}
-                                  <span className="ml-1 text-gray-400">({t.currentStock} {t.measurementUnit})</span>
+                                  <span>
+                                    {t.tenderType === 'Bağış' ? 'Bağış' : 'İhale'}: {t.tenderName} 
+                                    {t.tenderEndDate && ` (${format(t.tenderEndDate, 'dd.MM.yyyy')})`}
+                                  </span>
+                                  <span className="ml-2 font-mono">[{t.currentStock} {t.measurementUnit}]</span>
                                 </div>
                               ))}
                             </div>
@@ -995,7 +1021,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                               </div>
                               <div className="flex items-center text-xs text-red-500 mt-1">
                                 <span className="font-medium">{(group.totalReceived - group.totalStock).toFixed(2)}</span>
-                                <span className="ml-1">{group.measurementUnit} (Kullanılan)</span>
+                                <span className="ml-1">{group.measurementUnit} (Harcanan)</span>
                               </div>
                             </div>
                             {isLowStock && (
@@ -1003,11 +1029,22 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                                 Kritik Seviye
                               </span>
                             )}
-                            {group.totalLimit > 0 && (
-                              <div className="text-[10px] text-gray-400 mt-1">
-                                İhale Limiti: {group.totalLimit}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[10px]">
+                                <span>Toplam Limit:</span>
+                                <span className="font-bold">{group.totalLimit}</span>
                               </div>
-                            )}
+                              <div className="flex justify-between text-[10px] text-red-600">
+                                <span>Kullanılan Limit:</span>
+                                <span className="font-bold">{usedLimit.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-[10px] text-green-600">
+                                <span>Kullanılabilir Limit:</span>
+                                <span className="font-bold">{remainingLimit.toFixed(2)}</span>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-2">
@@ -1025,7 +1062,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                                 <button className="text-indigo-600 hover:text-indigo-900 p-1">
                                   <Edit2 className="w-4 h-4" />
                                 </button>
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover/edit:block border border-gray-200">
+                                <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 hidden group-hover/edit:block border border-gray-200">
                                   <div className="px-3 py-1 text-xs font-bold text-gray-500 border-b">Düzenlenecek İhale Seçin:</div>
                                   {group.tenders.map(t => (
                                     <button
@@ -1043,6 +1080,65 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         </tr>
                       );
                     })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Süresi Dolan İhaleler Bölümü */}
+          <div className="bg-white shadow sm:rounded-lg overflow-hidden">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-orange-50">
+              <h3 className="text-lg font-medium text-orange-800 flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                Süresi Dolan İhaleler
+              </h3>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İhale Adı</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bitiş Tarihi</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kalan Ürünler</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {items.filter(i => i.tenderEndDate && i.tenderEndDate < Date.now()).length === 0 ? (
+                    <tr><td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">Süresi dolan ihale bulunmuyor.</td></tr>
+                  ) : (
+                    // Group by tenderId
+                    Object.values(items.filter(i => i.tenderEndDate && i.tenderEndDate < Date.now()).reduce((acc, item) => {
+                      const key = item.tenderId || item.tenderName || 'unknown';
+                      if (!acc[key]) {
+                        acc[key] = {
+                          tenderName: item.tenderName,
+                          endDate: item.tenderEndDate,
+                          items: []
+                        };
+                      }
+                      acc[key].items.push(item);
+                      return acc;
+                    }, {} as Record<string, { tenderName?: string, endDate?: number, items: Item[] } >)).map((tender: any, idx) => (
+                      <tr key={idx} className="bg-orange-50/20">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{tender.tenderName}</td>
+                        <td className="px-6 py-4 text-sm text-red-600 font-bold">
+                          {tender.endDate ? format(tender.endDate, 'dd.MM.yyyy') : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-500">
+                          {tender.items.filter((i: Item) => i.currentStock > 0).length} Kalem Stoklu Ürün
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => generateTenderReport(tender.tenderName || '', unit, tender.items, items, transactions, personnel)}
+                            className="text-blue-600 hover:text-blue-900 flex items-center justify-end w-full"
+                          >
+                            <FileText className="w-4 h-4 mr-1" /> Rapor
+                          </button>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -1533,7 +1629,10 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                       >
                         <option value="">Seçiniz...</option>
                         {items.map(i => (
-                          <option key={i.id} value={i.id}>{i.name} {i.tenderName ? `(${i.tenderName})` : ''} - Mevcut: {i.currentStock} {i.measurementUnit}</option>
+                          <option key={i.id} value={i.id}>
+                            {i.name} {i.tenderName ? `(${i.tenderName})` : ''} 
+                            - Alınan: {i.totalReceived || 0} / Limit: {i.tenderLimit || 0}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -1614,9 +1713,20 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
                       >
                         <option value="">Seçiniz...</option>
-                        {items.map(i => (
-                          <option key={i.id} value={i.id}>{i.name} (Mevcut: {i.currentStock} {i.measurementUnit})</option>
-                        ))}
+                        {items
+                          .filter(i => i.currentStock > 0)
+                          .sort((a, b) => a.createdAt - b.createdAt) // Sort by date for FIFO
+                          .map((i, idx, arr) => {
+                            const isOldest = !arr.slice(0, idx).some(prev => prev.name === i.name);
+                            return (
+                              <option key={i.id} value={i.id} className={isOldest ? 'font-bold' : ''}>
+                                {i.name} {i.tenderName ? `(${i.tenderName})` : ''} 
+                                {isOldest ? ' [İLK ÇIKILACAK]' : ''} 
+                                - Mevcut: {i.currentStock} {i.measurementUnit}
+                              </option>
+                            );
+                          })
+                        }
                       </select>
                     </div>
                     <div className="w-32">

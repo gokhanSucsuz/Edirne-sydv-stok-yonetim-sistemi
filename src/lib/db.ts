@@ -25,6 +25,7 @@ export interface Item {
   measurementUnit: string;
   currentStock: number;
   createdAt: number;
+  tenderId?: string; // Unique ID for the tender
   tenderName?: string;
   tenderEndDate?: number;
   tenderLimit?: number;
@@ -182,10 +183,7 @@ export async function addTransaction(tx: Omit<Transaction, 'id' | 'remainingStoc
   if (!item) throw new Error('Item not found');
 
   const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(item.unit);
-  if (needsTender && (!item.tenderName || !item.tenderLimit)) {
-    throw new Error('İhale bilgisi girilmeden stok işlemi yapılamaz.');
-  }
-
+  
   if (tx.type === 'GİRİŞ') {
     if (needsTender && item.tenderLimit) {
       const totalReceived = item.totalReceived || 0;
@@ -195,29 +193,41 @@ export async function addTransaction(tx: Omit<Transaction, 'id' | 'remainingStoc
     }
     item.currentStock += tx.quantity;
     item.totalReceived = (item.totalReceived || 0) + tx.quantity;
+    await itemStore.put(item);
+    const txId = await txStore.add({ ...tx, remainingStock: item.currentStock });
+    await txDb.done;
+    return txId;
   } else if (tx.type === 'ÇIKIŞ') {
-    if (item.currentStock === 0) {
+    // FIFO Logic: Find all items with the same name in the same unit, sort by createdAt
+    const allItems = await itemStore.index('by-unit').getAll(item.unit);
+    const sameNameItems = allItems
+      .filter(i => i.name === item.name && i.currentStock > 0)
+      .sort((a, b) => a.createdAt - b.createdAt);
+
+    if (sameNameItems.length === 0) {
       throw new Error('Stok bitti! İşlem yapılamaz.');
     }
-    if (item.currentStock < tx.quantity) {
-      throw new Error('Yetersiz stok!');
+
+    const totalAvailable = sameNameItems.reduce((acc, i) => acc + i.currentStock, 0);
+    if (totalAvailable < tx.quantity) {
+      throw new Error('Yetersiz toplam stok!');
     }
-    
-    if (item.previousTenderStock && item.previousTenderStock > 0) {
-      if (tx.quantity <= item.previousTenderStock) {
-        item.previousTenderStock -= tx.quantity;
-      } else {
-        item.previousTenderStock = 0;
-      }
+
+    // Check if the requested item is the oldest one
+    const oldestItem = sameNameItems[0];
+    if (item.id !== oldestItem.id) {
+      throw new Error(`FIFO Kuralı: En eski tarihli ihaledeki (${oldestItem.tenderName}) stok bitmeden bu ihaleden çıkış yapılamaz.`);
     }
 
     item.currentStock -= tx.quantity;
+    await itemStore.put(item);
+    const txId = await txStore.add({ ...tx, remainingStock: item.currentStock });
+    await txDb.done;
+    return txId;
   }
-
-  await itemStore.put(item);
-  const txId = await txStore.add({ ...tx, remainingStock: item.currentStock });
+  
   await txDb.done;
-  return txId;
+  return 0;
 }
 
 // Master Items API
