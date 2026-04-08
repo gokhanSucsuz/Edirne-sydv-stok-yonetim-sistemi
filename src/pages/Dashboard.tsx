@@ -61,12 +61,16 @@ export default function Dashboard() {
         // Group items by name within the unit to check total stock
         const groupedByProduct = unitItems.reduce((acc, item) => {
           if (!acc[item.name]) {
-            acc[item.name] = { totalStock: 0, totalLimit: 0 };
+            acc[item.name] = { totalStock: 0, totalLimit: 0, latestCreatedAt: 0 };
           }
           acc[item.name].totalStock += item.currentStock;
-          acc[item.name].totalLimit += (item.tenderLimit || 0);
+          // Use the limit of the most recently created tender as the reference for low stock calculation
+          if (item.createdAt > (acc[item.name].latestCreatedAt || 0)) {
+            acc[item.name].totalLimit = (item.tenderLimit || 0);
+            acc[item.name].latestCreatedAt = item.createdAt;
+          }
           return acc;
-        }, {} as Record<string, { totalStock: number, totalLimit: number }>);
+        }, {} as Record<string, { totalStock: number, totalLimit: number, latestCreatedAt: number }>);
 
         const productValues = Object.values(groupedByProduct);
         const zeroStock = productValues.filter(p => p.totalStock <= 0);

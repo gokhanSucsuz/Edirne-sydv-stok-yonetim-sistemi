@@ -116,14 +116,19 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         totalLimit: 0,
         measurementUnit: item.measurementUnit,
         unit: item.unit,
-        tenders: []
+        tenders: [],
+        latestCreatedAt: 0
       };
     }
     acc[item.name].totalStock += item.currentStock;
-    acc[item.name].totalLimit += (item.tenderLimit || 0);
+    // Use the limit of the most recently created tender as the reference for low stock calculation
+    if (item.createdAt > (acc[item.name].latestCreatedAt || 0)) {
+      acc[item.name].totalLimit = (item.tenderLimit || 0);
+      acc[item.name].latestCreatedAt = item.createdAt;
+    }
     acc[item.name].tenders.push(item);
     return acc;
-  }, {} as Record<string, GroupedItem>);
+  }, {} as Record<string, GroupedItem & { latestCreatedAt?: number }>);
 
   const groupedList: GroupedItem[] = Object.values(groupedItems);
 
@@ -208,6 +213,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
       printMuayeneKabul({
         itemName: newItemName,
+        tenderName: tenderName, // Added tenderName
         quantity: tenderLimit,
         measurementUnit: newItemUnit,
         documentNo: addDocumentNo,
@@ -591,6 +597,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
       printBulkMuayeneKabul({
         items: addedItemsForPrint,
+        tenderName: bulkTenderName, // Added tenderName
         documentNo: bulkDocumentNo,
         personnelName: personnelMap[Number(bulkPersonnelId)],
         date: Date.now()
@@ -654,6 +661,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
             <tr>
               <th>Sıra</th>
               <th>Malzeme/Ürün Adı</th>
+              <th>İhale Adı</th>
               <th>Miktarı</th>
               <th>Birimi</th>
             </tr>
@@ -662,6 +670,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
             <tr>
               <td>1</td>
               <td>${data.itemName}</td>
+              <td>${data.tenderName || '-'}</td>
               <td>${data.quantity}</td>
               <td>${data.measurementUnit}</td>
             </tr>
@@ -682,7 +691,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     printWindow.document.close();
   };
 
-  const printBulkMuayeneKabul = (data: { items: any[], documentNo: string, personnelName: string, date: number }) => {
+  const printBulkMuayeneKabul = (data: { items: any[], tenderName?: string, documentNo: string, personnelName: string, date: number }) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -729,6 +738,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
             <tr>
               <th>Sıra</th>
               <th>Malzeme/Ürün Adı</th>
+              <th>İhale Adı</th>
               <th>Miktarı</th>
               <th>Birimi</th>
             </tr>
@@ -738,6 +748,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <tr>
                 <td>${index + 1}</td>
                 <td>${item.itemName}</td>
+                <td>${data.tenderName || '-'}</td>
                 <td>${item.quantity}</td>
                 <td>${item.measurementUnit}</td>
               </tr>
