@@ -56,11 +56,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = async () => {
+    console.log('Google login started');
     const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    if (result.user.email !== AUTHORIZED_EMAIL) {
-      await signOut(auth);
-      throw new Error('Bu sisteme erişim yetkiniz bulunmamaktadır.');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      console.log('Google login result:', result.user.email);
+      if (result.user.email !== AUTHORIZED_EMAIL) {
+        console.log('Unauthorized email, signing out');
+        await signOut(auth);
+        throw new Error('Bu sisteme erişim yetkiniz bulunmamaktadır.');
+      }
+      console.log('Authorized email, login successful');
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
     }
   };
 
