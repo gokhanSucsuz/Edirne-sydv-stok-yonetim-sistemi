@@ -18,6 +18,7 @@ interface AuthContextType {
   user: User | null;
   personnel: Personnel | null;
   loading: boolean;
+  loginError: string | null;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerPersonnel: (data: { name: string; title: string; tcNo: string; password: string }) => Promise<void>;
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [personnel, setPersonnel] = useState<Personnel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async () => {
     console.log('Google login started');
+    setLoginError(null);
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
@@ -69,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Authorized email, login successful');
     } catch (error) {
       console.error('Google login error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setLoginError(errorMessage);
       throw error;
     }
   };
@@ -122,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, personnel, loading, loginWithGoogle, loginWithEmail, registerPersonnel, logout }}>
+    <AuthContext.Provider value={{ user, personnel, loading, loginError, loginWithGoogle, loginWithEmail, registerPersonnel, logout }}>
       {children}
     </AuthContext.Provider>
   );

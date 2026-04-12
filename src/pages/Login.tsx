@@ -4,31 +4,15 @@ import { LogIn, Mail, Lock, ShieldCheck } from 'lucide-react';
 import { APP_LOGO_URL } from '../constants';
 
 export default function Login() {
-  const { loginWithGoogle, loginWithEmail } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const { loginWithGoogle, loginError } = useAuth();
   const [loading, setLoading] = useState(false);
-
-  React.useEffect(() => {
-    const savedError = localStorage.getItem('loginError');
-    if (savedError) {
-      setError(savedError);
-      localStorage.removeItem('loginError');
-    }
-  }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setError('');
-    localStorage.removeItem('loginError');
     try {
       await loginWithGoogle();
     } catch (err: any) {
       console.error('Login error caught in component:', err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      localStorage.setItem('loginError', errorMessage);
-      window.location.reload();
     } finally {
       setLoading(false);
     }
@@ -50,9 +34,9 @@ export default function Login() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {error && (
-            <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 text-red-700 text-sm">
-              {error}
+          {loginError && (
+            <div className="mb-4 bg-red-100 border-l-4 border-red-600 p-4 text-red-800 text-sm font-bold shadow-sm">
+              {loginError}
             </div>
           )}
 
