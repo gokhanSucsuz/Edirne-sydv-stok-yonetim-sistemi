@@ -65,6 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await signInWithPopup(auth, provider);
       console.log('Google login result:', result.user.email);
+      if (result.user.email !== AUTHORIZED_EMAIL) {
+        console.log('Unauthorized email, signing out');
+        await signOut(auth);
+        throw new Error('Sisteme erişim yetkiniz bulunmamaktadır. Lütfen sistem yöneticisi ile iletişime geçiniz.');
+      }
+      console.log('Authorized email, login successful');
     } catch (error) {
       console.error('Google login error:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
