@@ -17,6 +17,7 @@ import {
 import { format } from 'date-fns';
 import { PackageOpen, Edit2, X, AlertCircle, Search, Building2, Calendar, Package, Plus, FileText } from 'lucide-react';
 import { generateTenderReport } from '../lib/reports';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TenderGroup {
   tenderName: string;
@@ -26,6 +27,7 @@ interface TenderGroup {
 }
 
 export default function TenderManagement() {
+  const { personnel: currentPersonnel } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -39,7 +41,7 @@ export default function TenderManagement() {
   const [editTenderName, setEditTenderName] = useState('');
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderItems, setEditTenderItems] = useState<Item[]>([]);
-  const [editPersonnelId, setEditPersonnelId] = useState('');
+  const [editPersonnelId, setEditPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [editDocumentNo, setEditDocumentNo] = useState(generateUniqueDocNo());
   const [editConfirm, setEditConfirm] = useState(false);
   const [allowHeaderEdit, setAllowHeaderEdit] = useState(false);
@@ -119,12 +121,12 @@ export default function TenderManagement() {
   };
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [newItemId, setNewItemId] = useState<number | ''>('');
+  const [newItemId, setNewItemId] = useState<string | ''>('');
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
 
   const handleAddItemToTender = () => {
     if (!newItemId || !newItemLimit) return;
-    const masterItem = items.find(i => i.id === Number(newItemId));
+    const masterItem = items.find(i => i.id === newItemId);
     if (!masterItem) return;
 
     const newItem: Item = {
@@ -158,7 +160,7 @@ export default function TenderManagement() {
     }
 
     try {
-      const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
+      const selectedPersonnel = personnel.find(p => p.id === editPersonnelId);
       if (!selectedPersonnel) return;
 
       // Update existing and add new items
@@ -187,7 +189,7 @@ export default function TenderManagement() {
           if (changes.length > 0) {
             newHistory.push({
               date: Date.now(),
-              personnelId: Number(editPersonnelId),
+              personnelId: editPersonnelId,
               personnelName: selectedPersonnel.name,
               changes: changes.join(', ')
             });
@@ -209,7 +211,7 @@ export default function TenderManagement() {
             tenderLimit: Number(item.tenderLimit),
             tenderHistory: [{
               date: Date.now(),
-              personnelId: Number(editPersonnelId),
+              personnelId: editPersonnelId,
               personnelName: selectedPersonnel.name,
               changes: 'İhaleye sonradan eklendi'
             }]
@@ -217,12 +219,12 @@ export default function TenderManagement() {
 
           // Initial stock entry for new item
           await addTransaction({
-            itemId: newItemId as number,
+            itemId: newItemId,
             unit: item.unit,
             type: 'GİRİŞ',
             quantity: Number(item.tenderLimit),
             date: Date.now(),
-            personnelId: Number(editPersonnelId),
+            personnelId: editPersonnelId,
             description: 'İhaleye Sonradan Eklenen Ürün Stoğu',
             documentNo: editDocumentNo
           });
@@ -323,7 +325,7 @@ export default function TenderManagement() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      generateTenderReport(tender.tenderName, tender.unit, tender.items, items, transactions, personnel);
+                      generateTenderReport(tender.tenderName, tender.unit, tender.items, items, transactions, personnel, currentPersonnel);
                     }}
                     className="text-blue-600 text-sm font-medium flex items-center hover:underline"
                   >

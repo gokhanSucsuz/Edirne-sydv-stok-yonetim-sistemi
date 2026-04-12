@@ -22,12 +22,14 @@ import { APP_LOGO_URL } from '../constants';
 import { Link } from 'react-router-dom';
 import { generateItemReport, generateMonthlyInventoryReport, generateTenderReport } from '../lib/reports';
 import { cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UnitPanelProps {
   unit: UnitType;
 }
 
 export default function UnitPanel({ unit }: UnitPanelProps) {
+  const { personnel: currentPersonnel } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
@@ -39,7 +41,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [tenderName, setTenderName] = useState('');
   const [tenderEndDate, setTenderEndDate] = useState('');
   const [tenderLimit, setTenderLimit] = useState<number | ''>('');
-  const [addPersonnelId, setAddPersonnelId] = useState('');
+  const [addPersonnelId, setAddPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [addDocumentNo, setAddDocumentNo] = useState(generateUniqueDocNo());
   
   const needsTender = ['Vefa Temizlik', 'Aşevi', 'Dergah'].includes(unit);
@@ -54,7 +56,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editTenderEndDate, setEditTenderEndDate] = useState('');
   const [editTenderLimit, setEditTenderLimit] = useState<number | ''>('');
   const [editTenderType, setEditTenderType] = useState<'İhale' | 'Bağış'>('İhale');
-  const [editPersonnelId, setEditPersonnelId] = useState('');
+  const [editPersonnelId, setEditPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [editDocumentNo, setEditDocumentNo] = useState(generateUniqueDocNo());
   const [editConfirm, setEditConfirm] = useState(false);
 
@@ -65,7 +67,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [showTenderModal, setShowTenderModal] = useState(false);
   const [bulkTenderName, setBulkTenderName] = useState('');
   const [bulkTenderEndDate, setBulkTenderEndDate] = useState('');
-  const [bulkPersonnelId, setBulkPersonnelId] = useState('');
+  const [bulkPersonnelId, setBulkPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [bulkDocumentNo, setBulkDocumentNo] = useState(generateUniqueDocNo());
   const [bulkTenderType, setBulkTenderType] = useState<'İhale' | 'Bağış'>('İhale');
   const [bulkItems, setBulkItems] = useState([{ name: '', unit: 'Adet', limit: '' }]);
@@ -73,15 +75,15 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   // Bulk Entry Modal
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
-  const [bulkEntryItems, setBulkEntryItems] = useState<{ itemId: number | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
-  const [bulkEntryPersonnelId, setBulkEntryPersonnelId] = useState('');
+  const [bulkEntryItems, setBulkEntryItems] = useState<{ itemId: string | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
+  const [bulkEntryPersonnelId, setBulkEntryPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [bulkEntryDocumentNo, setBulkEntryDocumentNo] = useState(generateUniqueDocNo());
   const [bulkEntryDescription, setBulkEntryDescription] = useState('');
 
   // Bulk Exit Modal
   const [showBulkExitModal, setShowBulkExitModal] = useState(false);
-  const [bulkExitItems, setBulkExitItems] = useState<{ itemId: number | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
-  const [bulkExitPersonnelId, setBulkExitPersonnelId] = useState('');
+  const [bulkExitItems, setBulkExitItems] = useState<{ itemId: string | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
+  const [bulkExitPersonnelId, setBulkExitPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [bulkExitDocumentNo, setBulkExitDocumentNo] = useState(generateUniqueDocNo());
   const [bulkExitDescription, setBulkExitDescription] = useState('');
 
@@ -90,7 +92,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const [editingTenderName, setEditingTenderName] = useState('');
   const [editTenderItems, setEditTenderItems] = useState<Item[]>([]);
   const [editTenderEndDateVal, setEditTenderEndDateVal] = useState('');
-  const [editTenderPersonnelId, setEditTenderPersonnelId] = useState('');
+  const [editTenderPersonnelId, setEditTenderPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [editTenderConfirm, setEditTenderConfirm] = useState(false);
   const [allowTenderHeaderEdit, setAllowTenderHeaderEdit] = useState(false);
 
@@ -205,12 +207,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     
     if (needsTender && tenderLimit) {
       await addTransaction({
-        itemId: newItemId as number,
+        itemId: newItemId,
         unit: unit,
         type: 'GİRİŞ',
         quantity: Number(tenderLimit),
         date: Date.now(),
-        personnelId: Number(addPersonnelId),
+        personnelId: addPersonnelId,
         description: 'İhale Başlangıç Stoğu',
         documentNo: addDocumentNo
       });
@@ -221,7 +223,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         quantity: tenderLimit,
         measurementUnit: newItemUnit,
         documentNo: addDocumentNo,
-        personnelName: personnelMap[Number(addPersonnelId)],
+        personnelName: personnel.find(p => p.id === addPersonnelId)?.name || '',
         date: Date.now()
       });
     }
@@ -295,7 +297,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           }
         }
 
-        const selectedPersonnel = personnel.find(p => p.id === Number(editPersonnelId));
+        const selectedPersonnel = personnel.find(p => p.id === editPersonnelId);
         if (!selectedPersonnel) return;
         
         if (isNewTender) {
@@ -305,7 +307,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
         newHistory.push({
           date: Date.now(),
-          personnelId: Number(editPersonnelId),
+          personnelId: editPersonnelId,
           personnelName: selectedPersonnel.name,
           changes: changes.join(', ')
         });
@@ -333,7 +335,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         type: 'GİRİŞ',
         quantity: Number(editTenderLimit),
         date: Date.now(),
-        personnelId: Number(editPersonnelId),
+        personnelId: editPersonnelId,
         description: 'Yeni İhale Stoğu',
         documentNo: editDocumentNo
       });
@@ -343,7 +345,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         quantity: editTenderLimit,
         measurementUnit: editUnit,
         documentNo: editDocumentNo,
-        personnelName: personnelMap[Number(editPersonnelId)],
+        personnelName: personnelMap[editPersonnelId],
         date: Date.now()
       });
     }
@@ -406,7 +408,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         return;
       }
       
-      const selectedItem = items.find(i => i.id === Number(item.itemId));
+      const selectedItem = items.find(i => i.id === item.itemId);
       if (selectedItem && needsTender && selectedItem.tenderLimit) {
         const totalReceived = selectedItem.totalReceived || 0;
         if (totalReceived + Number(item.quantity) > selectedItem.tenderLimit) {
@@ -419,7 +421,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     try {
       const addedItemsForPrint = [];
       for (const item of bulkEntryItems) {
-        const selectedItem = items.find(i => i.id === Number(item.itemId));
+        const selectedItem = items.find(i => i.id === item.itemId);
         if (!selectedItem) continue;
 
         await addTransaction({
@@ -428,7 +430,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           type: 'GİRİŞ',
           quantity: Number(item.quantity),
           date: Date.now(),
-          personnelId: Number(bulkEntryPersonnelId),
+          personnelId: bulkEntryPersonnelId,
           description: bulkEntryDescription || 'Toplu Stok Girişi',
           documentNo: bulkEntryDocumentNo
         });
@@ -445,7 +447,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         items: addedItemsForPrint,
         tenderName: 'Toplu Stok Girişi',
         documentNo: bulkEntryDocumentNo,
-        personnelName: personnelMap[Number(bulkEntryPersonnelId)],
+        personnelName: personnel.find(p => p.id === bulkEntryPersonnelId)?.name || '',
         date: Date.now()
       });
 
@@ -496,7 +498,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         alert('Tüm satırlar için malzeme ve miktar girilmelidir.');
         return;
       }
-      const masterItem = items.find(i => i.id === Number(item.itemId));
+      const masterItem = items.find(i => i.id === item.itemId);
       if (masterItem) {
         const totalStock = groupedItems[masterItem.name]?.totalStock || 0;
         if (totalStock < Number(item.quantity)) {
@@ -509,7 +511,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     try {
       for (const item of bulkExitItems) {
         const quantityToExit = Number(item.quantity);
-        const masterItem = items.find(i => i.id === Number(item.itemId));
+        const masterItem = items.find(i => i.id === item.itemId);
         if (!masterItem) continue;
 
         // FIFO Logic: Find all items with same name in this unit, sort by createdAt
@@ -528,7 +530,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
             type: 'ÇIKIŞ',
             quantity: takeFromThis,
             date: Date.now(),
-            personnelId: Number(bulkExitPersonnelId),
+            personnelId: bulkExitPersonnelId,
             description: bulkExitDescription || 'Toplu Stok Çıkışı (FIFO)',
             documentNo: bulkExitDocumentNo
           });
@@ -580,7 +582,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
 
     try {
-      const selectedPersonnel = personnel.find(p => p.id === Number(editTenderPersonnelId));
+      const selectedPersonnel = personnel.find(p => p.id === editTenderPersonnelId);
       if (!selectedPersonnel) return;
 
       for (const item of editTenderItems) {
@@ -598,7 +600,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         if (changes.length > 0) {
           newHistory.push({
             date: Date.now(),
-            personnelId: Number(editTenderPersonnelId),
+            personnelId: editTenderPersonnelId,
             personnelName: selectedPersonnel.name,
             changes: changes.join(', ')
           });
@@ -659,7 +661,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     }
 
     try {
-      const selectedPersonnel = personnel.find(p => p.id === Number(bulkPersonnelId));
+      const selectedPersonnel = personnel.find(p => p.id === bulkPersonnelId);
       if (!selectedPersonnel) return;
 
       for (const item of bulkItems) {
@@ -675,7 +677,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           tenderType: bulkTenderType,
           tenderHistory: [{
             date: Date.now(),
-            personnelId: Number(bulkPersonnelId),
+            personnelId: bulkPersonnelId,
             personnelName: selectedPersonnel.name,
             changes: 'İhale/Bağış Tanımlandı'
           }]
@@ -1131,7 +1133,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => generateTenderReport(tender.tenderName || '', unit, tender.items, items, transactions, personnel)}
+                            onClick={() => generateTenderReport(tender.tenderName || '', unit, tender.items, items, transactions, personnel, currentPersonnel)}
                             className="text-blue-600 hover:text-blue-900 flex items-center justify-end w-full"
                           >
                             <FileText className="w-4 h-4 mr-1" /> Rapor

@@ -12,10 +12,13 @@ import {
   Menu,
   X,
   PackageOpen,
-  BookOpen
+  BookOpen,
+  LogOut,
+  User as UserIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
 
 const navigation = [
   { name: 'Gösterge Paneli', href: '/', icon: LayoutDashboard },
@@ -33,6 +36,17 @@ const navigation = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const { personnel, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Çıkış yapılırken hata oluştu:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -67,6 +81,26 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
+          {personnel && (
+            <div className="p-4 border-t border-gray-200">
+              <div className="flex items-center mb-4">
+                <div className="bg-red-100 p-2 rounded-full mr-3">
+                  <UserIcon className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{personnel.name}</p>
+                  <p className="text-xs text-gray-500">{personnel.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md"
+              >
+                <LogOut className="mr-3 h-5 w-5" />
+                Çıkış Yap
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -96,6 +130,26 @@ export default function Layout() {
               ))}
             </nav>
           </div>
+          {personnel && (
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center mb-4">
+                <div className="bg-red-100 p-2 rounded-full mr-3">
+                  <UserIcon className="w-5 h-5 text-red-600" />
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-sm font-bold text-gray-900 truncate">{personnel.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{personnel.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              >
+                <LogOut className="mr-3 h-5 w-5" />
+                Çıkış Yap
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -41,7 +41,7 @@ export default function MasterItems() {
     loadItems();
   };
 
-  const handleDeleteItem = async (id: number) => {
+  const handleDeleteItem = async (id: string) => {
     if (window.confirm('Bu malzemeyi listeden silmek istediğinize emin misiniz?')) {
       await deleteMasterItem(id);
       loadItems();

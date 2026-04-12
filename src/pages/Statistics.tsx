@@ -13,10 +13,12 @@ import { format, subDays, subWeeks, subMonths, isAfter } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { APP_LOGO_URL } from '../constants';
 import { Printer, FileText } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function Statistics() {
+  const { personnel: currentPersonnel } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
@@ -72,12 +74,12 @@ export default function Statistics() {
     const personnelMap = personnel.reduce((acc, p) => {
       if (p.id) acc[p.id] = p.name;
       return acc;
-    }, {} as Record<number, string>);
+    }, {} as Record<string, string>);
 
     const itemMap = items.reduce((acc, i) => {
       if (i.id) acc[i.id] = i;
       return acc;
-    }, {} as Record<number, Item>);
+    }, {} as Record<string, Item>);
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -213,8 +215,8 @@ export default function Statistics() {
           <div class="signature">
             <p>Hazırlayan</p>
             <br/><br/>
-            <p>................................</p>
-            <p>Vakıf Personeli</p>
+            <p><strong>${currentPersonnel?.name || '................................'}</strong></p>
+            <p>${currentPersonnel?.title || 'Vakıf Personeli'}</p>
           </div>
           <div class="signature">
             <p>Onaylayan</p>
@@ -222,6 +224,9 @@ export default function Statistics() {
             <p>................................</p>
             <p>Vakıf Müdürü</p>
           </div>
+        </div>
+        <div style="margin-top: 40px; padding-top: 10px; border-top: 1px dashed #ccc; font-size: 10px; color: #666; text-align: right;">
+          Raporu Hazırlayan: ${currentPersonnel ? `${currentPersonnel.name} (${currentPersonnel.title})` : 'Sistem'} | Yazdırılma: ${format(new Date(), 'dd.MM.yyyy HH:mm')}
         </div>
         <script>
           window.onload = function() { window.print(); window.close(); }
@@ -322,6 +327,9 @@ export default function Statistics() {
             ${tenderItems.length === 0 ? '<tr><td colspan="6" style="text-align:center;">İhale kaydı bulunamadı.</td></tr>' : ''}
           </tbody>
         </table>
+        <div style="margin-top: 40px; padding-top: 10px; border-top: 1px dashed #ccc; font-size: 10px; color: #666; text-align: right;">
+          Raporu Hazırlayan: ${currentPersonnel ? `${currentPersonnel.name} (${currentPersonnel.title})` : 'Sistem'} | Yazdırılma: ${format(new Date(), 'dd.MM.yyyy HH:mm')}
+        </div>
       </body>
       </html>
     `;

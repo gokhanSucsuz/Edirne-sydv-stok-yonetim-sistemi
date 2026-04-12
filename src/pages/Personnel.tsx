@@ -21,14 +21,14 @@ export default function Personnel() {
     e.preventDefault();
     if (!name || !title) return;
 
-    await addPersonnel({ name, title, tcNo });
+    await addPersonnel({ name, title, tcNo, email: '' });
     setName('');
     setTitle('');
     setTcNo('');
     loadPersonnel();
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Bu personeli silmek istediğinize emin misiniz?')) {
       await deletePersonnel(id);
       loadPersonnel();

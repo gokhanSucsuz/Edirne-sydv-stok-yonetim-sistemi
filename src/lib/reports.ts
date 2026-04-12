@@ -6,7 +6,8 @@ export const generateBulkMuayeneKabul = (
   items: { name: string; quantity: number; unit: string; measurementUnit: string }[],
   personnel: Personnel[],
   documentNo: string,
-  tenderName: string
+  tenderName: string,
+  currentUser?: Personnel | null
 ) => {
   const now = new Date();
   const printWindow = window.open('', '_blank');
@@ -33,6 +34,7 @@ export const generateBulkMuayeneKabul = (
         .footer { margin-top: 50px; display: flex; justify-content: space-around; }
         .signature { text-align: center; width: 200px; font-size: 12px; }
         .signature p { margin: 5px 0; }
+        .report-footer { margin-top: 40px; padding-top: 10px; border-top: 1px dashed #ccc; font-size: 10px; color: #666; text-align: right; }
         @media print {
           body { margin: 20px; }
           .no-print { display: none; }
@@ -97,6 +99,10 @@ export const generateBulkMuayeneKabul = (
         `).join('')}
       </div>
 
+      <div class="report-footer">
+        Raporu Hazırlayan: ${currentUser ? `${currentUser.name} (${currentUser.title})` : 'Sistem'} | Yazdırılma: ${format(now, 'dd.MM.yyyy HH:mm')}
+      </div>
+
       <script>
         window.onload = function() { 
           setTimeout(() => {
@@ -117,7 +123,8 @@ export const generateItemReport = (
   relatedItems: Item[],
   transactions: Transaction[],
   personnel: Personnel[],
-  type: 'all' | 'single' = 'all'
+  type: 'all' | 'single' = 'all',
+  currentUser?: Personnel | null
 ) => {
   const now = new Date();
   const printWindow = window.open('', '_blank');
@@ -150,6 +157,7 @@ export const generateItemReport = (
         .footer { margin-top: 40px; display: flex; justify-content: space-between; }
         .signature { text-align: center; width: 180px; font-size: 11px; }
         .signature p { margin: 3px 0; }
+        .report-footer { margin-top: 40px; padding-top: 10px; border-top: 1px dashed #ccc; font-size: 10px; color: #666; text-align: right; }
         @media print {
           body { margin: 15px; }
         }
@@ -234,8 +242,8 @@ export const generateItemReport = (
         <div class="signature">
           <p>Hazırlayan</p>
           <br/><br/>
-          <p>................................</p>
-          <p>Vakıf Personeli</p>
+          <p><strong>${currentUser?.name || '................................'}</strong></p>
+          <p>${currentUser?.title || 'Vakıf Personeli'}</p>
         </div>
         <div class="signature">
           <p>Onaylayan</p>
@@ -243,6 +251,10 @@ export const generateItemReport = (
           <p>................................</p>
           <p>Vakıf Müdürü</p>
         </div>
+      </div>
+
+      <div class="report-footer">
+        Raporu Hazırlayan: ${currentUser ? `${currentUser.name} (${currentUser.title})` : 'Sistem'} | Yazdırılma: ${format(now, 'dd.MM.yyyy HH:mm')}
       </div>
 
       <script>
@@ -265,7 +277,8 @@ export const generateMonthlyInventoryReport = (
   transactions: Transaction[],
   personnel: Personnel[],
   month: number,
-  year: number
+  year: number,
+  currentUser?: Personnel | null
 ) => {
   const now = new Date();
   const printWindow = window.open('', '_blank');
@@ -306,6 +319,7 @@ export const generateMonthlyInventoryReport = (
         .footer { margin-top: 40px; display: flex; justify-content: space-between; }
         .signature { text-align: center; width: 180px; font-size: 11px; }
         .signature p { margin: 3px 0; }
+        .report-footer { margin-top: 40px; padding-top: 10px; border-top: 1px dashed #ccc; font-size: 10px; color: #666; text-align: right; }
         @media print {
           body { margin: 15px; }
           .no-print { display: none; }
@@ -366,8 +380,8 @@ export const generateMonthlyInventoryReport = (
         <div class="signature">
           <p>Hazırlayan</p>
           <br/><br/>
-          <p>................................</p>
-          <p>Vakıf Personeli</p>
+          <p><strong>${currentUser?.name || '................................'}</strong></p>
+          <p>${currentUser?.title || 'Vakıf Personeli'}</p>
         </div>
         <div class="signature">
           <p>Onaylayan</p>
@@ -375,6 +389,10 @@ export const generateMonthlyInventoryReport = (
           <p>................................</p>
           <p>Vakıf Müdürü</p>
         </div>
+      </div>
+
+      <div class="report-footer">
+        Raporu Hazırlayan: ${currentUser ? `${currentUser.name} (${currentUser.title})` : 'Sistem'} | Yazdırılma: ${format(now, 'dd.MM.yyyy HH:mm')}
       </div>
 
       <script>
@@ -398,7 +416,8 @@ export const generateTenderReport = (
   tenderItems: Item[],
   allItems: Item[],
   transactions: Transaction[],
-  personnel: Personnel[]
+  personnel: Personnel[],
+  currentUser?: Personnel | null
 ) => {
   const now = new Date();
   const printWindow = window.open('', '_blank');
@@ -433,6 +452,7 @@ export const generateTenderReport = (
         .signature { text-align: center; width: 180px; font-size: 11px; }
         .signature p { margin: 3px 0; }
         .info-box { border: 1px solid #000; padding: 10px; margin-bottom: 20px; font-size: 11px; }
+        .report-footer { margin-top: 40px; padding-top: 10px; border-top: 1px dashed #ccc; font-size: 10px; color: #666; text-align: right; }
         @media print {
           body { margin: 15px; }
           .no-print { display: none; }
@@ -537,8 +557,8 @@ export const generateTenderReport = (
         <div class="signature">
           <p>Hazırlayan</p>
           <br/><br/>
-          <p>................................</p>
-          <p>Vakıf Personeli</p>
+          <p><strong>${currentUser?.name || '................................'}</strong></p>
+          <p>${currentUser?.title || 'Vakıf Personeli'}</p>
         </div>
         <div class="signature">
           <p>Onaylayan</p>
@@ -546,6 +566,10 @@ export const generateTenderReport = (
           <p>................................</p>
           <p>Vakıf Müdürü</p>
         </div>
+      </div>
+
+      <div class="report-footer">
+        Raporu Hazırlayan: ${currentUser ? `${currentUser.name} (${currentUser.title})` : 'Sistem'} | Yazdırılma: ${format(now, 'dd.MM.yyyy HH:mm')}
       </div>
 
       <script>
