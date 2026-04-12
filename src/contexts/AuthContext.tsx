@@ -65,6 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
+    // Google ile giriş yapılmış olmalı
+    if (!user || user.email !== AUTHORIZED_EMAIL) {
+      throw new Error('Öncelikle Google ile giriş yapmalısınız.');
+    }
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
@@ -105,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await signOut(auth);
+    window.location.href = '/login';
   };
 
   return (
