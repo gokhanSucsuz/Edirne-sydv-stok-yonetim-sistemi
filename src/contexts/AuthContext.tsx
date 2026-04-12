@@ -20,6 +20,7 @@ interface AuthContextType {
   loading: boolean;
   loginError: string | null;
   loginWithGoogle: () => Promise<void>;
+  loginWithPassword: (personnelId: string, password: string) => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerPersonnel: (data: { name: string; title: string; tcNo: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -64,18 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await signInWithPopup(auth, provider);
       console.log('Google login result:', result.user.email);
-      if (result.user.email !== AUTHORIZED_EMAIL) {
-        console.log('Unauthorized email, signing out');
-        await signOut(auth);
-        throw new Error('Bu sisteme erişim yetkiniz bulunmamaktadır.');
-      }
-      console.log('Authorized email, login successful');
     } catch (error) {
       console.error('Google login error:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       setLoginError(errorMessage);
       throw error;
     }
+  };
+
+  const loginWithPassword = async (personnelId: string, password: string) => {
+    const allPersonnel = await getPersonnel();
+    const personnel = allPersonnel.find(p => p.id === personnelId);
+    if (!personnel || personnel.password !== password) {
+      throw new Error('Hatalı şifre.');
+    }
+    // Login successful
+    setPersonnel(personnel);
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
@@ -104,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: data.name,
       title: data.title,
       tcNo: data.tcNo,
+      password: data.password,
       email: user.email!
     };
 
@@ -127,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, personnel, loading, loginError, loginWithGoogle, loginWithEmail, registerPersonnel, logout }}>
+    <AuthContext.Provider value={{ user, personnel, loading, loginError, loginWithGoogle, loginWithPassword, loginWithEmail, registerPersonnel, logout }}>
       {children}
     </AuthContext.Provider>
   );

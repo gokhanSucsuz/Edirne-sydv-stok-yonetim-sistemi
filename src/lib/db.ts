@@ -24,6 +24,7 @@ export interface Personnel {
   name: string;
   title: string;
   tcNo?: string; // Encrypted
+  password?: string; // Encrypted
   email: string;
   createdAt: number;
 }
@@ -89,6 +90,7 @@ export async function addPersonnel(personnel: Omit<Personnel, 'id' | 'createdAt'
   const data = {
     ...personnel,
     tcNo: personnel.tcNo ? encryptData(personnel.tcNo) : undefined,
+    password: personnel.password ? encryptData(personnel.password) : undefined,
     createdAt: Date.now()
   };
   const docRef = await addDoc(collection(db, 'personnel'), data);
