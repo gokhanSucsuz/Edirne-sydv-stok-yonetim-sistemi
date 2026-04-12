@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
+      if (firebaseUser && firebaseUser.email === AUTHORIZED_EMAIL) {
         // Check if this user is in the personnel collection
         const q = query(collection(db, 'personnel'), where('email', '==', firebaseUser.email));
         const querySnapshot = await getDocs(q);
