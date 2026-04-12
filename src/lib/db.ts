@@ -81,7 +81,8 @@ export async function getPersonnel() {
     return {
       ...data,
       id: doc.id,
-      tcNo: data.tcNo ? decryptData(data.tcNo) : undefined
+      tcNo: data.tcNo ? decryptData(data.tcNo) : undefined,
+      password: data.password ? decryptData(data.password) : undefined
     };
   });
 }
