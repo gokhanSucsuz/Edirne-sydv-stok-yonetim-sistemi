@@ -38,18 +38,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser && firebaseUser.email === AUTHORIZED_EMAIL) {
-        // Check if this user is in the personnel collection
-        const q = query(collection(db, 'personnel'), where('email', '==', firebaseUser.email));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const pData = querySnapshot.docs[0].data() as Personnel;
-          setPersonnel({ ...pData, id: querySnapshot.docs[0].id });
+      if (firebaseUser) {
+        if (firebaseUser.email === AUTHORIZED_EMAIL) {
+          setUser(firebaseUser);
+          // Personel otomatik seçilmeyecek, Register (Personel Seçim) sayfasına yönlendirilecek
+          setPersonnel(null);
         } else {
+          await signOut(auth);
+          setUser(null);
           setPersonnel(null);
         }
       } else {
+        setUser(null);
         setPersonnel(null);
       }
       setLoading(false);
