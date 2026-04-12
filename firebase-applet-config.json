@@ -1,10 +1,9 @@
 {
-  "projectId": "true-audio-428612-u7",
-  "appId": "1:641789000457:web:f1a377bef2069c6b7ab1d8",
-  "apiKey": "AIzaSyA9ZcVv6qmkCxy8lJJqWKywpdqHc-oYDSI",
-  "authDomain": "true-audio-428612-u7.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-db953a62-93a6-4662-865f-cf9be62f5db9",
-  "storageBucket": "true-audio-428612-u7.firebasestorage.app",
-  "messagingSenderId": "641789000457",
-  "measurementId": ""
+  "apiKey": "AIzaSyCedoRqKf19wSxE9Uq6iT5uRKsZBLiv3kE",
+  "authDomain": "stok-7278b.firebaseapp.com",
+  "projectId": "stok-7278b",
+  "storageBucket": "stok-7278b.firebasestorage.app",
+  "messagingSenderId": "702831744223",
+  "appId": "1:702831744223:web:54ff3b753128e75a20c56a",
+  "measurementId": "G-V6RTS7J549"
 }
