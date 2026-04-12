@@ -10,15 +10,25 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  React.useEffect(() => {
+    const savedError = localStorage.getItem('loginError');
+    if (savedError) {
+      setError(savedError);
+      localStorage.removeItem('loginError');
+    }
+  }, []);
+
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
+    localStorage.removeItem('loginError');
     try {
       await loginWithGoogle();
     } catch (err: any) {
       console.error('Login error caught in component:', err);
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(errorMessage || 'Giriş yapılamadı.');
+      localStorage.setItem('loginError', errorMessage);
+      window.location.reload();
     } finally {
       setLoading(false);
     }
