@@ -16,7 +16,9 @@ export default function Login() {
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      setError(err.message || 'Giriş yapılamadı.');
+      console.error('Login error caught in component:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage || 'Giriş yapılamadı.');
     } finally {
       setLoading(false);
     }
