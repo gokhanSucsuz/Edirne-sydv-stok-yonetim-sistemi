@@ -11,6 +11,7 @@ import {
   orderBy, 
   limit,
   runTransaction,
+  serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -252,4 +253,33 @@ export function generateUniqueDocNo(prefix: string = 'EVR') {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 5).toUpperCase();
   return `${prefix}-${timestamp}-${random}`;
+}
+
+// Backup API
+export async function getBackups() {
+  const q = query(collection(db, 'backups'), orderBy('createdAt', 'desc'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id
+  }));
+}
+
+export async function addBackupRecord(backup: any) {
+  return await addDoc(collection(db, 'backups'), {
+    ...backup,
+    createdAt: serverTimestamp()
+  });
+}
+
+export async function getAllDataForBackup() {
+  const collections = ['personnel', 'inventory', 'stockHistory', 'backups', 'transactions', 'masterItems'];
+  const allData: any = {};
+  
+  for (const coll of collections) {
+    const snap = await getDocs(collection(db, coll));
+    allData[coll] = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+  }
+  
+  return allData;
 }

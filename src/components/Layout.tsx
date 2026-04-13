@@ -14,7 +14,8 @@ import {
   PackageOpen,
   BookOpen,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  Database
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '../constants';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Bağış', href: '/unit/bagis', icon: Gift },
   { name: 'Vakıf', href: '/unit/vakif', icon: Building2 },
   { name: 'İstatistik & Raporlar', href: '/statistics', icon: BarChart3 },
+  { name: 'Yedekleme & Güvenlik', href: '/backup', icon: Database },
   { name: 'Kullanım Kılavuzu', href: '/guide', icon: BookOpen },
 ];
 

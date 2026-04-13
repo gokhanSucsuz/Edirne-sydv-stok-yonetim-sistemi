@@ -10,6 +10,7 @@ import Personnel from './pages/Personnel';
 import UnitPanel from './pages/UnitPanel';
 import Statistics from './pages/Statistics';
 import Guide from './pages/Guide';
+import Backup from './pages/Backup';
 import MasterItems from './pages/MasterItems';
 import TenderManagement from './pages/TenderManagement';
 import Login from './pages/Login';
@@ -59,6 +60,7 @@ function AppRoutes() {
         <Route path="unit/vakif" element={<UnitPanel unit="Vakıf" />} />
         <Route path="statistics" element={<Statistics />} />
         <Route path="guide" element={<Guide />} />
+        <Route path="backup" element={<Backup />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

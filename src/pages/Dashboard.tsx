@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { getPersonnel, getAllItems, getAllTransactions, getMasterItems, Personnel, Item, Transaction, UnitType } from '../lib/db';
+import { getPersonnel, getAllItems, getAllTransactions, getMasterItems, getBackups, Personnel, Item, Transaction, UnitType } from '../lib/db';
+import { Timestamp } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
-import { Package, ArrowDownRight, ArrowUpRight, Users, PackageOpen, AlertTriangle, AlertCircle, Droplets, Utensils, Home, Gift, Building2, FileText, Calendar } from 'lucide-react';
+import { Package, ArrowDownRight, ArrowUpRight, ArrowRight, Users, PackageOpen, AlertTriangle, AlertCircle, Droplets, Utensils, Home, Gift, Building2, FileText, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { generateMonthlyInventoryReport } from '../lib/reports';
 
@@ -23,7 +24,32 @@ interface UnitStats {
   transactionCount: number;
 }
 
+interface BackupRecord {
+  id: string;
+  createdAt: Timestamp;
+  type: string;
+  status: string;
+  fileName: string;
+  size: string;
+}
+
 export default function Dashboard() {
+  const [backupAlert, setBackupAlert] = useState(false);
+
+  useEffect(() => {
+    const checkBackup = async () => {
+      const backups = await getBackups() as unknown as BackupRecord[];
+      if (backups.length > 0) {
+        const lastBackup = backups[0].createdAt.toDate();
+        const diff = new Date().getTime() - lastBackup.getTime();
+        const days = diff / (1000 * 60 * 60 * 24);
+        if (days > 10) setBackupAlert(true);
+      } else {
+        setBackupAlert(true);
+      }
+    };
+    checkBackup();
+  }, []);
   const [personnelCount, setPersonnelCount] = useState(0);
   const [masterItemsCount, setMasterItemsCount] = useState(0);
   const [tendersCount, setTendersCount] = useState(0);
@@ -123,6 +149,32 @@ export default function Dashboard() {
 
       {/* Global Alerts */}
       <div className="space-y-3">
+        {backupAlert && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md shadow-sm animate-pulse">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700 font-bold">
+                    DİKKAT: Veri yedekleme periyodu (10 gün) aşılmıştır!
+                  </p>
+                  <p className="text-xs text-red-600">
+                    Veri güvenliği için lütfen acilen manuel yedek alınız veya otomatik yedeklemeyi kontrol ediniz.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/backup"
+                className="flex items-center text-sm font-medium text-red-700 hover:text-red-600"
+              >
+                Yedekleme Paneli
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        )}
         {personnelCount === 0 && (
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
             <div className="flex">

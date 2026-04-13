@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, User, Briefcase, CreditCard, Lock, AlertCircle, LogIn } from 'lucide-react';
+import { UserPlus, User, Briefcase, CreditCard, Lock, AlertCircle, LogIn, ShieldCheck } from 'lucide-react';
 import { APP_LOGO_URL } from '../constants';
 import { getPersonnel } from '../lib/db';
 
@@ -50,8 +50,15 @@ export default function Register() {
     }
   };
 
+  const [showKVKK, setShowKVKK] = useState(false);
+  const [kvkkAccepted, setKvkkAccepted] = useState(false);
+
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!kvkkAccepted) {
+      setError('Devam etmek için KVKK Aydınlatma Metni\'ni onaylamalısınız.');
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError('Şifreler eşleşmiyor.');
       return;
@@ -238,6 +245,31 @@ export default function Register() {
                 </div>
               </div>
 
+              <div className="flex items-start">
+                <div className="flex items-center h-5">
+                  <input
+                    id="kvkk"
+                    name="kvkk"
+                    type="checkbox"
+                    checked={kvkkAccepted}
+                    onChange={(e) => setKvkkAccepted(e.target.checked)}
+                    className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded"
+                  />
+                </div>
+                <div className="ml-3 text-sm">
+                  <label htmlFor="kvkk" className="font-medium text-gray-700">
+                    <button
+                      type="button"
+                      onClick={() => setShowKVKK(true)}
+                      className="text-red-600 hover:text-red-500 underline"
+                    >
+                      KVKK Aydınlatma Metni
+                    </button>
+                    'ni okudum ve kabul ediyorum.
+                  </label>
+                </div>
+              </div>
+
               <div className="pt-4 space-y-3">
                 <button
                   type="submit"
@@ -259,6 +291,52 @@ export default function Register() {
           )}
         </div>
       </div>
+
+      {showKVKK && (
+        <div className="fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowKVKK(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
+              <div>
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <ShieldCheck className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="mt-3 text-center sm:mt-5">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                    KVKK Aydınlatma Metni
+                  </h3>
+                  <div className="mt-4 text-sm text-gray-500 text-left space-y-4 max-h-96 overflow-y-auto p-2 border rounded">
+                    <p className="font-bold">1. Veri Sorumlusu</p>
+                    <p>Edirne Sosyal Yardımlaşma ve Dayanışma Vakfı (SYDV) olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca, kişisel verilerinizin güvenliğine büyük önem vermekteyiz.</p>
+                    
+                    <p className="font-bold">2. İşlenen Kişisel Veriler</p>
+                    <p>Sistem kullanımı kapsamında; Ad-Soyad, Unvan, TC Kimlik Numarası (şifreli) ve Sistem Şifresi (şifreli) verileriniz işlenmektedir.</p>
+                    
+                    <p className="font-bold">3. Veri İşleme Amacı</p>
+                    <p>Kişisel verileriniz; stok takip sistemine yetkili erişimin sağlanması, işlem güvenliğinin takibi ve vakıf envanter yönetiminin sağlıklı yürütülmesi amaçlarıyla işlenmektedir.</p>
+                    
+                    <p className="font-bold">4. Veri Güvenliği</p>
+                    <p>TC Kimlik Numaranız ve şifreniz veritabanında AES-256 standardında şifrelenmiş olarak saklanmaktadır. Verilere erişim sadece yetkili personel (edirnesydv@gmail.com) ile sınırlandırılmıştır.</p>
+                    
+                    <p className="font-bold">5. Haklarınız</p>
+                    <p>KVKK'nın 11. maddesi uyarınca; verilerinizin işlenip işlenmediğini öğrenme, düzeltilmesini isteme ve silinmesini talep etme haklarına sahipsiniz.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6">
+                <button
+                  type="button"
+                  className="inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm"
+                  onClick={() => setShowKVKK(false)}
+                >
+                  Anladım
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

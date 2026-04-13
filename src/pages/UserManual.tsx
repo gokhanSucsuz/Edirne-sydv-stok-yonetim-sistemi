@@ -2,11 +2,11 @@ import React from 'react';
 import { BookOpen, Shield, CheckCircle, HelpCircle, FileText, Settings, Database, Users, Package, ArrowRight } from 'lucide-react';
 import { APP_LOGO_URL } from '../constants';
 
-export default function Guide() {
+export default function UserManual() {
   return (
-    <div className="min-h-screen bg-[#f5f2ed] text-[#1a1a1a] font-serif -m-6 p-6">
+    <div className="min-h-screen bg-[#f5f2ed] text-[#1a1a1a] font-serif">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-12 px-4 sm:px-6 lg:px-8 shadow-sm rounded-t-xl">
+      <div className="bg-white border-b border-gray-200 py-12 px-4 sm:px-6 lg:px-8 shadow-sm">
         <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
           <img src={APP_LOGO_URL} alt="Logo" className="h-24 w-24 rounded-full shadow-xl mb-6 border-4 border-red-600" />
           <h1 className="text-4xl md:text-5xl font-light tracking-tight text-gray-900 mb-4">
