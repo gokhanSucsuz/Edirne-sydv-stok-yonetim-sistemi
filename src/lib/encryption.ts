@@ -1,12 +1,12 @@
-import CryptoJS from 'crypto-js';
+import CryptoJS from "crypto-js";
 
-const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'default-secret-key-123';
+const KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || "default-key-change-in-production";
 
-export const encryptData = (data: string): string => {
-  return CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
-};
+export function encryptData(data: string): string {
+  return CryptoJS.AES.encrypt(data, KEY).toString();
+}
 
-export const decryptData = (ciphertext: string): string => {
-  const bytes = CryptoJS.AES.decrypt(ciphertext, ENCRYPTION_KEY);
+export function decryptData(ciphertext: string): string {
+  const bytes = CryptoJS.AES.decrypt(ciphertext, KEY);
   return bytes.toString(CryptoJS.enc.Utf8);
-};
+}

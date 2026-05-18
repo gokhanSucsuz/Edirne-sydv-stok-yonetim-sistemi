@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { Item, Transaction, Personnel } from './db';
-import { APP_LOGO_URL } from '../constants';
+import { APP_LOGO_URL } from './constants';
 
 export const generateBulkMuayeneKabul = (
   items: { name: string; quantity: number; unit: string; measurementUnit: string }[],

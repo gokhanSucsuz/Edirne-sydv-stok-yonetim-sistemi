@@ -1,5 +1,8 @@
-import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+'use client';
+
+import React, { useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Users, 
@@ -17,9 +20,9 @@ import {
   User as UserIcon,
   Database
 } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '../constants';
-import { useAuth } from '../contexts/AuthContext';
+import { cn } from '@/lib/utils';
+import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '@/lib/constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
   { name: 'Gösterge Paneli', href: '/', icon: LayoutDashboard },
@@ -36,15 +39,35 @@ const navigation = [
   { name: 'Kullanım Kılavuzu', href: '/guide', icon: BookOpen },
 ];
 
-export default function Layout() {
+export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const { personnel, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, personnel, loading, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    } else if (!loading && user && !personnel && !pathname.startsWith('/register')) {
+      router.push('/register');
+    }
+  }, [user, personnel, loading, router, pathname]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
+
+  if (!user || (!personnel && !pathname.startsWith('/register'))) {
+    return null;
+  }
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
     } catch (error) {
       console.error('Çıkış yapılırken hata oluştu:', error);
     }
@@ -52,7 +75,6 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar */}
       <div className={cn("fixed inset-0 z-50 lg:hidden", sidebarOpen ? "block" : "hidden")}>
         <div className="fixed inset-0 bg-gray-900/80" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl flex flex-col">
@@ -67,20 +89,18 @@ export default function Layout() {
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => (
-              <NavLink
+              <Link
                 key={item.name}
-                to={item.href}
+                href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    isActive ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-100',
-                    'group flex items-center px-2 py-2 text-base font-medium rounded-md'
-                  )
-                }
+                className={cn(
+                  pathname === item.href ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-100',
+                  'group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                )}
               >
                 <item.icon className={cn("mr-4 flex-shrink-0 h-6 w-6")} aria-hidden="true" />
                 {item.name}
-              </NavLink>
+              </Link>
             ))}
           </nav>
           {personnel && (
@@ -106,7 +126,6 @@ export default function Layout() {
         </div>
       </div>
 
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div className="flex flex-col w-64 border-r border-gray-200 bg-white">
           <div className="flex flex-col items-center justify-center py-6 px-4 border-b border-gray-200 bg-red-600">
@@ -116,19 +135,17 @@ export default function Layout() {
           <div className="flex flex-col flex-1 overflow-y-auto">
             <nav className="flex-1 px-2 py-4 space-y-1">
               {navigation.map((item) => (
-                <NavLink
+                <Link
                   key={item.name}
-                  to={item.href}
-                  className={({ isActive }) =>
-                    cn(
-                      isActive ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-100',
-                      'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
-                    )
-                  }
+                  href={item.href}
+                  className={cn(
+                    pathname === item.href ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-100',
+                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                  )}
                 >
                   <item.icon className={cn("mr-3 flex-shrink-0 h-5 w-5")} aria-hidden="true" />
                   {item.name}
-                </NavLink>
+                </Link>
               ))}
             </nav>
           </div>
@@ -155,7 +172,6 @@ export default function Layout() {
         </div>
       </div>
 
-      {/* Main content */}
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-red-600 border-b border-gray-200">
           <div className="flex items-center">
@@ -168,7 +184,7 @@ export default function Layout() {
         </div>
         <main className="flex-1 relative overflow-y-auto focus:outline-none">
           <div className="py-6 px-4 sm:px-6 lg:px-8">
-            <Outlet />
+            {children}
           </div>
         </main>
       </div>
