@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { APP_LOGO_URL, APP_NAME, APP_SUBTITLE } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import AutoBackupCheck from './AutoBackupCheck';
 
 const navigation = [
   { name: 'Gösterge Paneli', href: '/', icon: LayoutDashboard },
@@ -211,6 +212,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <main className="flex-1 relative overflow-y-auto focus:outline-none">
           <div className="py-6 px-4 sm:px-6 lg:px-8">
+            <AutoBackupCheck />
             {children}
           </div>
         </main>
