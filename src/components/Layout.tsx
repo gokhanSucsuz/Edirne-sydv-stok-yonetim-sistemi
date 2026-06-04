@@ -45,8 +45,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const isLoggedIn = !loading && (user || personnel);
+
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !personnel) {
       router.push('/login');
     } else if (!loading && user && !personnel && !pathname.startsWith('/register')) {
       router.push('/register');
@@ -61,9 +63,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || (!personnel && !pathname.startsWith('/register'))) {
+  if (!isLoggedIn || (!personnel && !pathname.startsWith('/register'))) {
     return null;
   }
+
+  // Normal personel sadece birim sayfaları ve raporlamaya erişebilir
+  const isAdmin = !!user;
+  const filteredNavigation = navigation.filter(item => {
+    if (isAdmin) return true;
+    // Normal personel için kısıtlı menü
+    const allowed = ['/', '/statistics'];
+    const allowedPrefixes = ['/unit/'];
+    return allowed.includes(item.href) || allowedPrefixes.some(p => item.href.startsWith(p));
+  });
 
   const handleLogout = async () => {
     try {
@@ -88,7 +100,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => (
+            {filteredNavigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
@@ -134,7 +146,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex flex-col flex-1 overflow-y-auto">
             <nav className="flex-1 px-2 py-4 space-y-1">
-              {navigation.map((item) => (
+              {filteredNavigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}

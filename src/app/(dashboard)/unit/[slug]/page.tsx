@@ -18,7 +18,7 @@ import {
   checkDocumentNoExists,
   generateUniqueDocNo
 } from '@/lib/db';
-import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen, FileText, ChevronDown, Calendar } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, AlertCircle, Edit2, X, AlertTriangle, PackageOpen, FileText, ChevronDown, Calendar, ClipboardList } from 'lucide-react';
 import { format } from 'date-fns';
 import { APP_LOGO_URL } from '@/lib/constants';
 import Link from 'next/link';
@@ -874,10 +874,133 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   const isNewTender = editingItem && (editTenderName !== editingItem.tenderName);
 
+  const handleUnitInstantStockReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const dateStr = format(new Date(), 'dd.MM.yyyy');
+    const timeStr = format(new Date(), 'HH:mm');
+
+    const activeItems = groupedList.filter(g => g.totalStock > 0);
+
+    const rows = activeItems.map((group, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${group.name}</td>
+        <td style="text-align:center">${group.measurementUnit}</td>
+        <td style="text-align:right; font-weight:bold; color: ${group.totalStock < (group.totalLimit ? Math.max(group.totalLimit * 0.1, 2) : 2) ? '#cc6600' : '#000'}">${group.totalStock}</td>
+        <td style="text-align:center; color:#666; font-size:10px">${group.totalLimit > 0 ? `İhale: ${group.totalLimit}` : '-'}</td>
+        <td></td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <title>${unit} - Anlık Stok Raporu</title>
+        <style>
+          body { font-family: 'Times New Roman', Times, serif; margin: 30px; color: #000; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .header h1 { font-size: 15px; margin: 4px 0; font-weight: bold; }
+          .header h2 { font-size: 13px; margin: 4px 0; font-weight: normal; }
+          .report-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 14px; margin: 15px 0 5px 0; }
+          .report-subtitle { text-align: center; font-size: 12px; color: #444; margin-bottom: 12px; }
+          .date-line { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 12px; border-bottom: 1px solid #ccc; padding-bottom: 8px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; }
+          th, td { border: 1px solid #000; padding: 5px 8px; text-align: left; }
+          th { background-color: #e8e8e8; font-weight: bold; }
+          .warning-box { border: 2px solid #cc0000; padding: 6px 10px; margin-bottom: 12px; font-size: 11px; background: #fff8f8; }
+          .footer { margin-top: 30px; }
+          .signature-row { display: flex; justify-content: space-between; margin-top: 40px; }
+          .sig-box { text-align: center; width: 200px; }
+          .sig-box .line { border-top: 1px solid #000; margin-top: 40px; padding-top: 5px; font-size: 11px; }
+          .summary { font-size: 11px; margin-bottom: 12px; background: #f9f9f9; padding: 8px; border: 1px solid #ddd; }
+          @media print { body { margin: 15px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>T.C.</h1>
+          <h1>EDİRNE VALİLİĞİ</h1>
+          <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
+        </div>
+
+        <div class="report-title">ANLIK STOK DURUMU RAPORU (DENETİM)</div>
+        <div class="report-subtitle">${unit.toUpperCase()} BİRİMİ</div>
+
+        <div class="date-line">
+          <span>Rapor Tarihi: <strong>${dateStr}</strong></span>
+          <span>Rapor Saati: <strong>${timeStr}</strong></span>
+          <span>Hazırlayan: <strong>${currentPersonnel ? currentPersonnel.name + ' (' + currentPersonnel.title + ')' : 'Sistem'}</strong></span>
+        </div>
+
+        <div class="warning-box">
+          ⚠️ Bu rapor sistem üzerindeki anlık stok verilerini göstermektedir. <strong>Fiziksel Sayım</strong> sütununu doldurarak sistem kaydı ile depo stoğunu karşılaştırınız.
+        </div>
+
+        <div class="summary">
+          Toplam Malzeme Çeşidi: <strong>${activeItems.length}</strong> &nbsp;|&nbsp;
+          Birimi: <strong>${unit}</strong>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width:5%">S.No</th>
+              <th>Malzeme Adı</th>
+              <th style="width:10%; text-align:center">Ölçü Birimi</th>
+              <th style="width:15%; text-align:right">Sistem Stoğu</th>
+              <th style="width:15%; text-align:center">İhale Limit Bilgisi</th>
+              <th style="width:18%; text-align:center">Fiziksel Sayım</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="6" style="text-align:center; padding:15px;">Bu birimde aktif stok bulunmamaktadır.</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <p style="font-size:11px; text-indent:20px; margin-top:15px;">
+            Yukarıda listelenen malzemelerin fiziksel sayımı yapılmış olup sistem kaydı ile karşılaştırma işbu tutanakla belgelenmiştir.
+          </p>
+          <div class="signature-row">
+            <div class="sig-box">
+              <div class="line">Denetleyen<br/><br/>Adı Soyadı / İmza</div>
+            </div>
+            <div class="sig-box">
+              <div class="line">Depo Sorumlusu<br/><br/>${currentPersonnel ? currentPersonnel.name : '................................'}</div>
+            </div>
+            <div class="sig-box">
+              <div class="line">Onaylayan<br/><br/>Vakıf Müdürü / İmza</div>
+            </div>
+          </div>
+          <div style="margin-top:25px; padding-top:6px; border-top:1px dashed #ccc; font-size:9px; color:#666; text-align:right;">
+            ${unit} Birimi Sistem Raporu - ${dateStr} ${timeStr} | Kullanıcı: ${currentPersonnel ? currentPersonnel.name : 'Sistem'}
+          </div>
+        </div>
+        <script>window.onload = function() { window.print(); window.close(); }</script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">{unit} Paneli</h1>
+        <button
+          onClick={handleUnitInstantStockReport}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+          title="Denetim için anlık stok durumunu yazdır"
+        >
+          <ClipboardList className="w-4 h-4 mr-2" />
+          Anlık Stok Raporu
+        </button>
       </div>
 
       {lowStockItems.length > 0 && (

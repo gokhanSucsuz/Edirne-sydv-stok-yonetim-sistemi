@@ -14,7 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { format, subDays, subWeeks, subMonths, isAfter } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { APP_LOGO_URL } from '@/lib/constants';
-import { Printer, FileText } from 'lucide-react';
+import { Printer, FileText, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -241,6 +241,139 @@ export default function Statistics() {
     printWindow.document.close();
   };
 
+  const handleInstantStockReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const dateStr = format(new Date(), 'dd.MM.yyyy');
+    const timeStr = format(new Date(), 'HH:mm');
+
+    const filteredItems = items
+      .filter(item => reportUnit === 'Tümü' || item.unit === reportUnit)
+      .sort((a, b) => a.unit.localeCompare(b.unit) || a.name.localeCompare(b.name));
+
+    // Group by unit then by product name
+    const byUnit: Record<string, Record<string, { stock: number; unit: string; items: Item[] }>> = {};
+    for (const item of filteredItems) {
+      if (!byUnit[item.unit]) byUnit[item.unit] = {};
+      if (!byUnit[item.unit][item.name]) {
+        byUnit[item.unit][item.name] = { stock: 0, unit: item.measurementUnit, items: [] };
+      }
+      byUnit[item.unit][item.name].stock += item.currentStock;
+      byUnit[item.unit][item.name].items.push(item);
+    }
+
+    const unitSections = Object.entries(byUnit).map(([unitName, products]) => {
+      const rows = Object.entries(products)
+        .filter(([, p]) => p.stock > 0)
+        .map(([productName, p], idx) => `
+          <tr>
+            <td>${idx + 1}</td>
+            <td>${productName}</td>
+            <td style="text-align:center">${p.unit}</td>
+            <td style="text-align:right; font-weight:bold;">${p.stock}</td>
+            <td></td>
+          </tr>
+        `).join('');
+
+      if (!rows) return '';
+
+      return `
+        <div class="unit-section">
+          <div class="unit-title">${unitName.toUpperCase()} BİRİMİ - ANLIK STOK DURUMU</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:5%">S.No</th>
+                <th>Malzeme Adı</th>
+                <th style="width:10%; text-align:center">Ölçü Birimi</th>
+                <th style="width:15%; text-align:right">Mevcut Stok</th>
+                <th style="width:20%; text-align:center">Fiziksel Sayım</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Anlık Stok Raporu - Denetim</title>
+        <style>
+          body { font-family: 'Times New Roman', Times, serif; margin: 30px; color: #000; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .header h1 { font-size: 15px; margin: 4px 0; font-weight: bold; }
+          .header h2 { font-size: 13px; margin: 4px 0; font-weight: normal; }
+          .report-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 14px; margin: 15px 0 5px 0; }
+          .report-subtitle { text-align: center; font-size: 12px; color: #444; margin-bottom: 15px; }
+          .date-line { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 15px; }
+          .unit-section { margin-bottom: 25px; page-break-inside: avoid; }
+          .unit-title { background: #f2f2f2; font-weight: bold; font-size: 12px; padding: 6px 8px; border: 1px solid #000; margin-bottom: 0; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #000; padding: 5px 8px; text-align: left; }
+          th { background-color: #e8e8e8; font-weight: bold; }
+          .footer { margin-top: 30px; }
+          .signature-row { display: flex; justify-content: space-between; margin-top: 40px; }
+          .sig-box { text-align: center; width: 200px; }
+          .sig-box .line { border-top: 1px solid #000; margin-top: 40px; padding-top: 5px; font-size: 11px; }
+          .warning-box { border: 2px solid #cc0000; padding: 8px 12px; margin-bottom: 15px; font-size: 11px; }
+          @media print { body { margin: 15px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>T.C.</h1>
+          <h1>EDİRNE VALİLİĞİ</h1>
+          <h2>Sosyal Yardımlaşma ve Dayanışma Vakfı Başkanlığı</h2>
+        </div>
+
+        <div class="report-title">ANLIK STOK DURUMU RAPORU (DENETİM)</div>
+        <div class="report-subtitle">${reportUnit !== 'Tümü' ? reportUnit.toUpperCase() + ' BİRİMİ' : 'TÜM BİRİMLER'}</div>
+
+        <div class="date-line">
+          <span>Rapor Tarihi: <strong>${dateStr}</strong></span>
+          <span>Rapor Saati: <strong>${timeStr}</strong></span>
+          <span>Hazırlayan: <strong>${currentPersonnel ? currentPersonnel.name + ' (' + currentPersonnel.title + ')' : 'Sistem'}</strong></span>
+        </div>
+
+        <div class="warning-box">
+          ⚠️ Bu rapor sistem üzerindeki anlık stok verilerini göstermektedir. Fiziksel sayım sütununu doldurarak sistem kaydı ile depo stoku karşılaştırınız.
+        </div>
+
+        ${unitSections || '<p style="text-align:center; padding: 20px;">Seçilen birimde stok bulunmamaktadır.</p>'}
+
+        <div class="footer">
+          <p style="font-size:11px; text-indent:20px;">
+            Yukarıda listelenen malzemelerin fiziksel sayımı yapılmış olup sistem kaydı ile karşılaştırma işlu işbu tutanakla belgelenmiştir.
+          </p>
+          <div class="signature-row">
+            <div class="sig-box">
+              <div class="line">Denetleyen<br/><br/>Adı Soyadı / İmza</div>
+            </div>
+            <div class="sig-box">
+              <div class="line">Depo Sorumlusu<br/><br/>${currentPersonnel ? currentPersonnel.name : '................................'}</div>
+            </div>
+            <div class="sig-box">
+              <div class="line">Onaylayan<br/><br/>Vakıf Müdürü / İmza</div>
+            </div>
+          </div>
+          <div style="margin-top:30px; padding-top:8px; border-top:1px dashed #ccc; font-size:9px; color:#666; text-align:right;">
+            Sistem Raporu - ${dateStr} ${timeStr} | Kullanıcı: ${currentPersonnel ? currentPersonnel.name : 'Sistem'}
+          </div>
+        </div>
+        <script>window.onload = function() { window.print(); window.close(); }</script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const handleTenderPrint = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -403,6 +536,46 @@ export default function Statistics() {
         </div>
         <p className="mt-2 text-xs text-gray-500">
           * Raporlar resmi yazışma kurallarına uygun olarak hazırlanır ve yazdırılabilir formattadır. PDF olarak kaydetmek için yazdırma ekranında "PDF Olarak Kaydet" seçeneğini kullanabilirsiniz.
+        </p>
+      </div>
+
+      {/* Anlık Stok Raporu - Denetim */}
+      <div className="bg-white shadow sm:rounded-lg p-6 border-l-4 border-orange-500">
+        <h3 className="text-lg font-medium text-gray-900 mb-1 flex items-center">
+          <ClipboardList className="w-5 h-5 mr-2 text-orange-500" />
+          Anlık Stok Raporu (Denetim)
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Depodaki fiziksel stok sayımını sistem kaydıyla karşılaştırmak için kullanın. Raporda "Fiziksel Sayım" sütunu boş bırakılır ve elle doldurulur.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Birim Seçin</label>
+            <select
+              value={reportUnit}
+              onChange={(e) => setReportUnit(e.target.value as any)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm p-2 border"
+            >
+              <option value="Tümü">Tüm Birimler</option>
+              <option value="Vefa Temizlik">Vefa Temizlik</option>
+              <option value="Aşevi">Aşevi</option>
+              <option value="Dergah">Dergah</option>
+              <option value="Bağış">Bağış</option>
+              <option value="Vakıf">Vakıf</option>
+            </select>
+          </div>
+          <div>
+            <button
+              onClick={handleInstantStockReport}
+              className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+            >
+              <ClipboardList className="w-4 h-4 mr-2" />
+              Anlık Stok Raporu Al
+            </button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-orange-600 font-medium">
+          ⚠️ Bu rapor denetim anındaki sistem stok durumunu gösterir. Fiziksel sayım sonuçları elle yazılarak karşılaştırma yapılır.
         </p>
       </div>
 

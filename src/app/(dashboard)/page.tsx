@@ -53,11 +53,12 @@ export default function Dashboard() {
     };
     checkBackup();
   }, []);
+
   const [personnelCount, setPersonnelCount] = useState(0);
   const [masterItemsCount, setMasterItemsCount] = useState(0);
   const [tendersCount, setTendersCount] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
-  const [personnelMap, setPersonnelMap] = useState<Record<number, string>>({});
+  const [personnelMap, setPersonnelMap] = useState<Record<string, string>>({});
   const [unitStats, setUnitStats] = useState<UnitStats[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
@@ -103,7 +104,6 @@ export default function Dashboard() {
             acc[item.name] = { totalStock: 0, totalLimit: 0, latestCreatedAt: 0 };
           }
           acc[item.name].totalStock += item.currentStock;
-          // Use the limit of the most recently created tender as the reference for low stock calculation
           if (item.createdAt > (acc[item.name].latestCreatedAt || 0)) {
             acc[item.name].totalLimit = (item.tenderLimit || 0);
             acc[item.name].latestCreatedAt = item.createdAt;
@@ -169,7 +169,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <Link
-                to="/backup"
+                href="/backup"
                 className="flex items-center text-sm font-medium text-red-700 hover:text-red-600"
               >
                 Yedekleme Paneli
@@ -184,7 +184,7 @@ export default function Dashboard() {
               <Users className="h-5 w-5 text-yellow-400" />
               <div className="ml-3">
                 <p className="text-sm text-yellow-700">
-                  Sistemde kayıtlı personel bulunmuyor. <Link to="/personnel" className="font-medium underline">Personel ekleyin</Link>.
+                  Sistemde kayıtlı personel bulunmuyor. <Link href="/personnel" className="font-medium underline">Personel ekleyin</Link>.
                 </p>
               </div>
             </div>
@@ -197,7 +197,7 @@ export default function Dashboard() {
               <AlertTriangle className="h-5 w-5 text-orange-400" />
               <div className="ml-3">
                 <p className="text-sm text-orange-700">
-                  Sistemde tanımlı malzeme bulunmuyor. <Link to="/master-items" className="font-medium underline">Malzeme tanımlayın</Link>.
+                  Sistemde tanımlı malzeme bulunmuyor. <Link href="/master-items" className="font-medium underline">Malzeme tanımlayın</Link>.
                 </p>
               </div>
             </div>
@@ -216,7 +216,7 @@ export default function Dashboard() {
             <p className="text-2xl font-semibold text-gray-900">{personnelCount}</p>
           </div>
         </div>
-        <Link to="/tenders" className="bg-white p-5 shadow rounded-lg flex items-center hover:bg-gray-50 transition-colors">
+        <Link href="/tenders" className="bg-white p-5 shadow rounded-lg flex items-center hover:bg-gray-50 transition-colors">
           <div className="p-3 bg-purple-100 rounded-full">
             <PackageOpen className="h-6 w-6 text-purple-600" />
           </div>
@@ -324,7 +324,7 @@ export default function Dashboard() {
                            stats.name === 'Bağış' ? 'bagis' : 'vakif';
           
           return (
-            <Link key={stats.name} to={`/unit/${unitPath}`} className="bg-white p-6 shadow rounded-lg hover:shadow-md transition-shadow border-t-4" style={{ borderTopColor: COLORS[index % COLORS.length] }}>
+            <Link key={stats.name} href={`/unit/${unitPath}`} className="bg-white p-6 shadow rounded-lg hover:shadow-md transition-shadow border-t-4" style={{ borderTopColor: COLORS[index % COLORS.length] }}>
               <div className="flex justify-between items-start mb-4">
                 <div className="p-2 bg-gray-50 rounded-lg">
                   <Icon className="h-6 w-6 text-gray-600" />
@@ -373,7 +373,7 @@ export default function Dashboard() {
       <div className="bg-white shadow sm:rounded-lg overflow-hidden">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg leading-6 font-medium text-gray-900">Son İşlemler</h3>
-          <Link to="/statistics" className="text-sm text-red-600 hover:text-red-800 font-medium">Tüm Raporlar →</Link>
+          <Link href="/statistics" className="text-sm text-red-600 hover:text-red-800 font-medium">Tüm Raporlar →</Link>
         </div>
         <ul className="divide-y divide-gray-200">
           {recentTransactions.length === 0 ? (
@@ -385,9 +385,9 @@ export default function Dashboard() {
                   <div className="flex items-center">
                     <div className={`p-2 rounded-full mr-3 ${tx.type === 'GİRİŞ' ? 'bg-green-100' : 'bg-red-100'}`}>
                       {tx.type === 'GİRİŞ' ? (
-                        <ArrowDownRight className={`h-4 w-4 ${tx.type === 'GİRİŞ' ? 'text-green-600' : 'text-red-600'}`} />
+                        <ArrowDownRight className="h-4 w-4 text-green-600" />
                       ) : (
-                        <ArrowUpRight className={`h-4 w-4 ${tx.type === 'GİRİŞ' ? 'text-green-600' : 'text-red-600'}`} />
+                        <ArrowUpRight className="h-4 w-4 text-red-600" />
                       )}
                     </div>
                     <div>
@@ -476,4 +476,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
