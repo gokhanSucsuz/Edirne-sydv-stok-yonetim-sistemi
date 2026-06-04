@@ -328,7 +328,7 @@ export default function TenderManagement() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      generateTenderReport(tender.tenderName, tender.unit, tender.items, items, transactions, personnel, currentPersonnel);
+                      generateTenderReport(tender.tenderName, tender.unit, tender.items, items, transactions, personnel, currentPersonnel as any);
                     }}
                     className="text-blue-600 text-sm font-medium flex items-center hover:underline"
                   >
@@ -533,7 +533,7 @@ export default function TenderManagement() {
                 <input 
                   type="number" 
                   value={newItemLimit} 
-                  onChange={e => setNewItemLimit(e.target.value)}
+                  onChange={e => setNewItemLimit(e.target.value === '' ? '' : Number(e.target.value))}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
                 />
               </div>

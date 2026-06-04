@@ -349,7 +349,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
         quantity: editTenderLimit,
         measurementUnit: editUnit,
         documentNo: editDocumentNo,
-        personnelName: personnelMap[editPersonnelId],
+        personnelName: personnel.find(p => p.id === editPersonnelId)?.name || '',
         date: Date.now()
       });
     }
@@ -860,12 +860,12 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
   const personnelMap = personnel.reduce((acc, p) => {
     if (p.id) acc[p.id] = p.name;
     return acc;
-  }, {} as Record<number, string>);
+  }, {} as Record<string, string>);
 
   const itemMap = items.reduce((acc, i) => {
     if (i.id) acc[i.id] = i;
     return acc;
-  }, {} as Record<number, Item>);
+  }, {} as Record<string, Item>);
 
   const lowStockItems = groupedList.filter(group => {
     if (group.totalStock <= 0) return false;
@@ -1184,7 +1184,9 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                             <div className="flex items-center">
                               {group.name}
                               {isLowStock && (
-                                <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title="Düşük Stok" />
+                                <span title="Düşük Stok">
+                                  <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" />
+                                </span>
                               )}
                             </div>
                             <div className="mt-1 space-y-1">
