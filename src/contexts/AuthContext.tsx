@@ -13,16 +13,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { AUTHORIZED_EMAIL } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
-
-export interface Personnel {
-  id?: string;
-  name: string;
-  title: string;
-  tcNo?: string;
-  password?: string;
-  email: string;
-  createdAt?: number;
-}
+import { Personnel } from '@/lib/db';
 
 interface AuthContextType {
   user: User | null;

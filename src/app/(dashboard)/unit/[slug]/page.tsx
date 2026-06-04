@@ -1367,7 +1367,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">
                             <div className="flex items-center">
                               {group.name}
-                              <AlertCircle className="w-4 h-4 text-red-600 ml-2" title="Stok Bitti" />
+                              <span title="Stok Bitti"><AlertCircle className="w-4 h-4 text-red-600 ml-2" /></span>
                             </div>
                             <div className="mt-1 space-y-1">
                               {group.tenders.map(t => (
