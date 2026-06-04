@@ -10,12 +10,12 @@ export async function GET(request: Request) {
     const id = searchParams.get('id');
     
     if (id) {
-      const item = await Item.findById(id).lean();
+      const item: any = await Item.findById(id).lean();
       if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 });
       return NextResponse.json({ ...item, id: item._id.toString(), _id: undefined });
     }
     
-    let query = {};
+    let query: any = {};
     if (unit) {
       query = { unit };
     }
