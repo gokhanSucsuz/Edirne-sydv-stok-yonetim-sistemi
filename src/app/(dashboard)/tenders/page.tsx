@@ -150,6 +150,7 @@ export default function TenderManagement() {
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editingTender) return;
     if (!editPersonnelId || !editConfirm || !editDocumentNo) {
       alert('İşlemi yapan personeli seçmeli, evrak no girmeli ve onay kutusunu işaretlemelisiniz.');
       return;
