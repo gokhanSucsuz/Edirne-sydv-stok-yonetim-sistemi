@@ -34,6 +34,7 @@ interface AuthContextType {
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerPersonnel: (data: { name: string; title: string; tcNo: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  updateCurrentPersonnel: (p: Personnel) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,6 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const router = useRouter();
+
+  const updateCurrentPersonnel = (p: Personnel) => {
+    setPersonnel(p);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -131,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, personnel, loading, loginError, loginWithGoogle, loginWithPassword, loginWithEmail, registerPersonnel, logout }}>
+    <AuthContext.Provider value={{ user, personnel, loading, loginError, loginWithGoogle, loginWithPassword, loginWithEmail, registerPersonnel, logout, updateCurrentPersonnel }}>
       {children}
     </AuthContext.Provider>
   );

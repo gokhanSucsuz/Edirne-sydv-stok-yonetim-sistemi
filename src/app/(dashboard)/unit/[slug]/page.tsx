@@ -78,6 +78,7 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
   // Bulk Entry Modal
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
+  const [bulkEntrySelectedTenderId, setBulkEntrySelectedTenderId] = useState<string>('');
   const [bulkEntryItems, setBulkEntryItems] = useState<{ itemId: string | '', quantity: number | '' }[]>([{ itemId: '', quantity: '' }]);
   const [bulkEntryPersonnelId, setBulkEntryPersonnelId] = useState<string>(currentPersonnel?.id || '');
   const [bulkEntryDocumentNo, setBulkEntryDocumentNo] = useState(generateUniqueDocNo());
@@ -872,6 +873,44 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
     return group.totalStock < threshold;
   });
 
+  // İhale tabanlı yönetim hesapları
+  const now = Date.now();
+  const tenderGroups = (() => {
+    const map: Record<string, { tenderId: string; tenderName: string; endDate?: number; items: Item[]; isExpired: boolean; allStockGone: boolean }> = {};
+    for (const item of items) {
+      const key = item.tenderId || item.tenderName || 'unknown';
+      if (!map[key]) {
+        map[key] = {
+          tenderId: key,
+          tenderName: item.tenderName || 'Bilinmiyor',
+          endDate: item.tenderEndDate,
+          items: [],
+          isExpired: !!(item.tenderEndDate && item.tenderEndDate < now),
+          allStockGone: true
+        };
+      }
+      map[key].items.push(item);
+      if (item.currentStock > 0) map[key].allStockGone = false;
+    }
+    return Object.values(map);
+  })();
+
+  // Giriş için: tarihi geçmemiş ihaleler
+  const entryTenders = tenderGroups.filter(t => !t.isExpired);
+  // Çıkış için: stoğu olan tüm ihaleler (tarihi geçmiş bile olsa çıkış yapılabilir)
+  const exitTenders = tenderGroups.filter(t => !t.allStockGone);
+  // Tamamlanan ihaleler (tüm stok bitti)
+  const completedTenders = tenderGroups.filter(t => t.allStockGone);
+
+  // needsTender birimlerinde ihale yoksa butonlar disabled
+  const hasActiveTender = !needsTender || entryTenders.length > 0;
+  const hasExitableTender = !needsTender || exitTenders.length > 0;
+
+  // Seçili ihaleye ait ürünler (bulk entry için)
+  const bulkEntryTenderItems = bulkEntrySelectedTenderId
+    ? items.filter(i => (i.tenderId || i.tenderName || 'unknown') === bulkEntrySelectedTenderId)
+    : [];
+
   const isNewTender = editingItem && (editTenderName !== editingItem.tenderName);
 
   const handleUnitInstantStockReport = () => {
@@ -1046,6 +1085,20 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           <div className="bg-white shadow sm:rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Stok Giriş / Çıkış Paneli</h3>
             
+            {needsTender && entryTenders.length === 0 && (
+              <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-md mb-4">
+                <div className="flex">
+                  <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="ml-3">
+                    <p className="text-sm text-amber-700 font-bold">Bu birimde aktif ihale bulunmamaktadır!</p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Stok giriş/çıkışı yapabilmek için önce "İhale / Bağış Tanımla" butonunu kullanarak bir ihale oluşturmanız gerekmektedir.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <button
                 type="button"
@@ -1059,7 +1112,13 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <button
                 type="button"
                 onClick={() => setShowBulkEntryModal(true)}
-                className="flex flex-col justify-center items-center p-4 border-2 border-dashed border-green-300 rounded-xl text-sm font-semibold text-green-700 bg-green-50 hover:bg-green-100 transition-all shadow-sm"
+                disabled={!hasActiveTender}
+                title={!hasActiveTender ? 'Önce ihale tanımlamanız gerekiyor' : 'Stok girişi yap'}
+                className={`flex flex-col justify-center items-center p-4 border-2 border-dashed rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                  !hasActiveTender
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
+                    : 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100'
+                }`}
               >
                 <ArrowDownRight className="w-6 h-6 mb-1" />
                 Toplu Stok Girişi
@@ -1068,7 +1127,13 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
               <button
                 type="button"
                 onClick={() => setShowBulkExitModal(true)}
-                className="flex flex-col justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all shadow-sm"
+                disabled={!hasExitableTender}
+                title={!hasExitableTender ? 'Çıkış yapılacak stok bulunmuyor' : 'Stok çıkışı yap'}
+                className={`flex flex-col justify-center items-center p-4 border-2 border-dashed rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                  !hasExitableTender
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
+                    : 'border-gray-300 text-gray-700 bg-gray-50 hover:bg-gray-100'
+                }`}
               >
                 <ArrowUpRight className="w-6 h-6 mb-1" />
                 Toplu Stok Çıkışı
@@ -1716,6 +1781,33 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-xl max-h-[90vh] flex flex-col">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Toplu Stok Girişi</h3>
             <form onSubmit={handleSubmitBulkEntry} className="flex flex-col flex-1 overflow-hidden">
+              
+              {/* Adım 1: İhale Seçimi */}
+              <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+                <label className="block text-sm font-bold text-blue-800 mb-2">1. Hangi İhale İçin Giriş Yapıyorsunuz?</label>
+                <select
+                  required
+                  value={bulkEntrySelectedTenderId}
+                  onChange={e => {
+                    setBulkEntrySelectedTenderId(e.target.value);
+                    setBulkEntryItems([{ itemId: '', quantity: '' }]);
+                  }}
+                  className="block w-full rounded-md border-blue-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border bg-white"
+                >
+                  <option value="">İhale seçiniz...</option>
+                  {entryTenders.map(t => (
+                    <option key={t.tenderId} value={t.tenderId}>
+                      {t.tenderName} {t.endDate ? `(Bitiş: ${format(t.endDate, 'dd.MM.yyyy')})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {bulkEntrySelectedTenderId && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    {bulkEntryTenderItems.length} ürün bu ihaleye aittir.
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4 mb-6 bg-gray-50 p-3 rounded-md border border-gray-200">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">İşlemi Yapan Personel</label>
@@ -1739,16 +1831,21 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
 
               <div className="flex justify-between items-center mb-2">
                 <h4 className="text-md font-medium text-gray-800">Giriş Yapılacak Ürünler</h4>
-                <button type="button" onClick={handleAddBulkEntryRow} className="text-sm text-red-600 hover:text-red-800 flex items-center font-medium">
+                <button type="button" onClick={handleAddBulkEntryRow} disabled={!bulkEntrySelectedTenderId} className="text-sm text-red-600 hover:text-red-800 flex items-center font-medium disabled:opacity-40 disabled:cursor-not-allowed">
                   <Plus className="w-4 h-4 mr-1" /> Yeni Satır Ekle
                 </button>
               </div>
 
               <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md p-2 bg-gray-50">
-                {bulkEntryItems.map((item, index) => (
+                {!bulkEntrySelectedTenderId ? (
+                  <div className="flex items-center justify-center h-24 text-gray-400 text-sm">
+                    Önce yukarıdan bir ihale seçin
+                  </div>
+                ) : (
+                  bulkEntryItems.map((item, index) => (
                   <div key={index} className="flex items-center space-x-3 mb-3 bg-white p-3 rounded shadow-sm border border-gray-100">
                     <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Malzeme / İhale</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Malzeme</label>
                       <select
                         required
                         value={item.itemId}
@@ -1756,10 +1853,9 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2 border"
                       >
                         <option value="">Seçiniz...</option>
-                        {items.map(i => (
+                        {bulkEntryTenderItems.map(i => (
                           <option key={i.id} value={i.id}>
-                            {i.name} {i.tenderName ? `(${i.tenderName})` : ''} 
-                            - Alınan: {i.totalReceived || 0} / Limit: {i.tenderLimit || 0}
+                            {i.name} - Alınan: {i.totalReceived || 0} / Limit: {i.tenderLimit || 0}
                           </option>
                         ))}
                       </select>
@@ -1774,7 +1870,8 @@ export default function UnitPanel({ unit }: UnitPanelProps) {
                       </button>
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
 
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
