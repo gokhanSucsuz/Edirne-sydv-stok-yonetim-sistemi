@@ -56,7 +56,7 @@ export default function ProfilePage() {
         password
       };
       
-      await updatePersonnel(updatedData);
+      await updatePersonnel(updatedData as any);
       updateCurrentPersonnel(updatedData);
       
       setMessage({ type: 'success', text: 'Profil bilgileriniz başarıyla güncellendi.' });
